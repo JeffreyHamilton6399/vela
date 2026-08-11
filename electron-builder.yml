@@ -27,7 +27,7 @@ electronLanguages:
 
 publish:
   provider: github
-  owner: vela-browser
+  owner: JeffreyHamilton6399
   repo: vela
   releaseType: release
 

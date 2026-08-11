@@ -6,7 +6,7 @@ The privacy posture of DuckDuckGo, the visual language of Instagram, the feature
 
 ## Install
 
-Download from [Releases](https://github.com/vela-browser/vela/releases/latest): `.exe` for Windows, `.dmg` for macOS, `.AppImage` for Linux.
+Download from [Releases](https://github.com/JeffreyHamilton6399/vela/releases/latest): `.exe` for Windows, `.dmg` for macOS, `.AppImage` for Linux.
 
 Builds are **not code-signed yet**, so the first launch will be met with a warning:
 
