@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+release/
+*.asar
+
+# Secrets — no tokens, keys, or credentials ever land in this repo
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

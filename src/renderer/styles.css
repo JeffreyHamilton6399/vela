@@ -1,0 +1,100 @@
+@import 'tailwindcss';
+
+/* Dark mode follows the OS by default; `data-theme` on <html> overrides it. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme {
+  /* Near-white / near-black surfaces. */
+  --color-surface: #fafafa;
+  --color-raised: #ffffff;
+  --color-line: #dbdbdb;
+  --color-ink: #171717;
+  --color-ink-muted: #737373;
+  --color-hover: #efefef;
+  --color-danger: #ed4956;
+
+  /* Strict 8px grid: one spacing unit IS 8px, so `p-2` is 16px, `h-5` is 40px.
+     Every integer spacing utility in the app is therefore on-grid by
+     construction rather than by convention. */
+  --spacing: 0.5rem;
+
+  --radius-tab: 10px;
+  --radius-card: 12px;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Spring easing for micro-interactions. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:root {
+  /* The Instagram gradient. It appears in exactly two places:
+     the active tab indicator (stage 3) and focus rings. */
+  --vela-gradient: linear-gradient(135deg, #8b5cf6 0%, #e1306c 55%, #f59e0b 100%);
+  --titlebar-height: 40px;
+  color-scheme: light dark;
+}
+
+[data-theme='dark'] {
+  --color-surface: #0a0a0a;
+  --color-raised: #171717;
+  --color-line: #262626;
+  --color-ink: #fafafa;
+  --color-ink-muted: #a3a3a3;
+  --color-hover: #262626;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* No native focus ring anywhere; the gradient ring below replaces it. */
+  :focus-visible {
+    outline: none;
+  }
+}
+
+@utility drag {
+  -webkit-app-region: drag;
+}
+
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Gradient focus ring, drawn as a masked border so it can hold a gradient. */
+@utility focus-ring {
+  position: relative;
+
+  &:focus-visible::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    padding: 2px;
+    background: var(--vela-gradient);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}

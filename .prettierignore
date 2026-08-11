@@ -1,0 +1,9 @@
+# The spec is yours, not the formatter's.
+vela-master-prompt.md
+
+out/
+dist/
+node_modules/
+package-lock.json
+playwright-report/
+test-results/

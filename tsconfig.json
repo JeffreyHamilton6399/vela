@@ -1,0 +1,10 @@
+{
+  "//": "Editor convenience only. `npm run typecheck` uses tsconfig.node.json + tsconfig.web.json, which keep the Node and DOM lib boundaries honest.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "*.config.ts"]
+}
