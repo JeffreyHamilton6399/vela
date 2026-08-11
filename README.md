@@ -6,7 +6,7 @@ The privacy posture of DuckDuckGo, the visual language of Instagram, the feature
 
 ## Install
 
-Download from [Releases](https://github.com/JeffreyHamilton6399/vela/releases/latest): `.exe` for Windows, `.dmg` for macOS, `.AppImage` for Linux.
+Download from **[jeffreyhamilton6399.github.io/vela](https://jeffreyhamilton6399.github.io/vela/)** or [Releases](https://github.com/JeffreyHamilton6399/vela/releases/latest): `.exe` for Windows, `.dmg` for macOS, `.AppImage` for Linux.
 
 Builds are **not code-signed yet**, so the first launch will be met with a warning:
 
@@ -109,6 +109,20 @@ One spacing unit is 8px (`--spacing: 0.5rem`), so every integer Tailwind spacing
 
 ## CI
 
-`.github/workflows/ci.yml` runs typecheck → lint → format → unit tests, then the Playwright suite on a Windows / macOS / Linux matrix.
+> **The workflows are parked and not running yet.** They live at
+> `ci/github-workflows/` rather than `.github/workflows/`, because GitHub refuses a
+> push that touches workflow files unless the pushing token carries the `workflow`
+> scope. To switch them on:
+>
+> ```sh
+> gh auth refresh -s workflow
+> git mv ci/github-workflows .github/workflows
+> git commit -m "Enable CI" && git push
+> ```
+>
+> Until then, `npm run verify` and `npm run test:e2e` are the gates, run locally,
+> and releases are built with `npm run package`.
 
-`.github/workflows/release.yml` fires on a `v*` tag: it runs the same gates, then builds installers on all three platforms and attaches them to the Release, and deploys `docs/` to GitHub Pages.
+`ci.yml` runs typecheck → lint → format → unit tests, then the Playwright suite on a Windows / macOS / Linux matrix.
+
+`release.yml` fires on a `v*` tag: it runs the same gates, then builds installers on all three platforms and attaches them to the Release, and deploys `docs/` to GitHub Pages. That last part is what will produce the macOS `.dmg` and Linux `.AppImage` that 0.1.0 is missing.
