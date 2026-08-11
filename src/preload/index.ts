@@ -21,6 +21,9 @@ import {
   historyEntrySchema,
   assistantReplySchema,
   assistantStatusSchema,
+  accountStateSchema,
+  actionResultSchema,
+  vaultEntrySchema,
   windowStateSchema,
   type PrivacyReport,
   type SettingsImportResult,
@@ -31,6 +34,9 @@ import {
   type AssistantMessage,
   type AssistantReply,
   type AssistantStatus,
+  type AccountState,
+  type ActionResult,
+  type VaultEntry,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -219,6 +225,40 @@ const bridge: VelaBridge = {
       return () => {
         ipcRenderer.off(EVENT_CHANNELS.downloadsChanged, wrapped);
       };
+    },
+  },
+  account: {
+    async state(): Promise<AccountState> {
+      return accountStateSchema.parse(await ipcRenderer.invoke(INVOKE_CHANNELS.accountState));
+    },
+    async create(email: string, masterPassword: string): Promise<ActionResult> {
+      return actionResultSchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.accountCreate, { email, masterPassword }),
+      );
+    },
+    async unlock(masterPassword: string): Promise<ActionResult> {
+      return actionResultSchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.accountUnlock, { masterPassword }),
+      );
+    },
+    async lock(): Promise<boolean> {
+      return z.boolean().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.accountLock));
+    },
+    async list(): Promise<VaultEntry[]> {
+      return z.array(vaultEntrySchema).parse(await ipcRenderer.invoke(INVOKE_CHANNELS.vaultList));
+    },
+    async save(host: string, username: string, password: string): Promise<ActionResult> {
+      return actionResultSchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.vaultSave, { host, username, password }),
+      );
+    },
+    async remove(id: string): Promise<boolean> {
+      return z.boolean().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.vaultRemove, { id }));
+    },
+    async fill(tabId: string): Promise<{ ok: boolean; error: string | null; filled: number }> {
+      return z
+        .object({ ok: z.boolean(), error: z.string().nullable(), filled: z.number() })
+        .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.vaultFill, { tabId }));
     },
   },
   assistant: {

@@ -129,7 +129,17 @@ export const BeakerIcon = (props: IconProps): JSX.Element => (
 );
 
 export const BookIcon = (props: IconProps): JSX.Element => (
-  <Icon shape="M3 3h4.5c.8 0 1.5.7 1.5 1.5V13c0-.8-.7-1.5-1.5-1.5H3zM13 3H8.5C7.7 3 7 3.7 7 4.5V13c0-.8.7-1.5 1.5-1.5H13z" {...props} />
+  <Icon
+    shape="M3 3h4.5c.8 0 1.5.7 1.5 1.5V13c0-.8-.7-1.5-1.5-1.5H3zM13 3H8.5C7.7 3 7 3.7 7 4.5V13c0-.8.7-1.5 1.5-1.5H13z"
+    {...props}
+  />
+);
+
+export const KeyIcon = (props: IconProps): JSX.Element => (
+  <Icon
+    shape="M10.5 2.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM8.4 7.6 2.5 13.5M4.5 11.5l1.5 1.5M6 10l1.5 1.5"
+    {...props}
+  />
 );
 
 export const SparkIcon = (props: IconProps): JSX.Element => (

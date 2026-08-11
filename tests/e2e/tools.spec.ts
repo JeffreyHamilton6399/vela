@@ -91,6 +91,7 @@ test('settings open on Ctrl+, and write through to the store', async () => {
   await chrome.keyboard.press('Control+,');
 
   await expect(chrome.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await chrome.getByRole('button', { name: 'Privacy' }).click();
 
   // A controlled checkbox only flips once main echoes the change back, which
   // is slower than Playwright's uncheck() assertion allows.

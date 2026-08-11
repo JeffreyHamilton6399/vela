@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { BrowserWindow, app, ipcMain, nativeTheme, session, shell } from 'electron';
+import { BrowserWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import { EVENT_CHANNELS, type AppInfo, type UpdateState } from '../shared/types/ipc.js';
 import { resolvePlatform } from '../shared/platform.js';
 import { registerWindowIpc } from './ipc/register-window-ipc.js';
@@ -17,6 +17,8 @@ import { defaultTileTitle } from './speed-dial.js';
 import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
 import { HistoryStore } from './history/history-store.js';
+import { Vault } from './account/vault.js';
+import { fillLogin } from './account/autofill.js';
 import { startDevMetrics } from './dev-metrics.js';
 import { SURFACE } from './window-options.js';
 import { VelaWindow } from './vela-window.js';
@@ -56,6 +58,7 @@ let blocker: BlockerHandle | null = null;
 let favicons: FaviconCache | null = null;
 let updater: Updater | null = null;
 let history: HistoryStore | null = null;
+let vault: Vault | null = null;
 
 function getAppInfo(): AppInfo {
   return {
@@ -151,6 +154,7 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     history = new HistoryStore();
+    vault = new Vault();
     favicons = new FaviconCache(app.getPath('userData'), true);
     await favicons.load();
     blocker = await loadBlocker(RESOURCES_DIR);
@@ -220,13 +224,51 @@ if (!app.requestSingleInstanceLock()) {
         };
       },
       cachedFavicon: (url) => favicons?.get(url) ?? null,
-      openOllamaDownload: async () => {
-        // Vela opens the official page rather than running an installer: a
-        // browser that silently executes downloaded binaries is a browser you
-        // should not trust, whatever the binary happens to be.
-        await shell.openExternal('https://ollama.com/download');
+      vault: vault,
+      fillLogin: async (sender, tabId) => {
+        const owner = windowFor(sender);
+        const tab = owner?.manager.find(tabId) ?? null;
+        const contents = tab?.webContents ?? null;
+        if (vault === null || contents === null) {
+          return { ok: false, error: 'No page to fill.', filled: 0 };
+        }
+        if (!vault.unlocked) return { ok: false, error: 'Sign in first.', filled: 0 };
+
+        let host: string;
+        try {
+          host = new URL(tab?.url ?? '').host;
+        } catch {
+          return { ok: false, error: 'This page has no address to match.', filled: 0 };
+        }
+
+        const entry = vault.findForHost(host);
+        if (entry === null) {
+          return { ok: false, error: `Nothing saved for ${host}.`, filled: 0 };
+        }
+
+        const password = vault.reveal(entry.id);
+        // eslint-disable-next-line security/detect-possible-timing-attacks -- a null check on our own decrypt result, not a secret comparison
+        if (password === null) return { ok: false, error: 'Could not read that entry.', filled: 0 };
+
+        const filled = await fillLogin(contents, entry.username, password);
+        return filled === 0
+          ? { ok: false, error: 'No login form found on this page.', filled: 0 }
+          : { ok: true, error: null, filled };
+      },
+      openOllamaDownload: (sender) => {
+        // Opened in a Vela tab rather than handed to shell.openExternal: this
+        // is a browser, and openExternal fails outright on a machine with no
+        // working default-browser association — which is exactly the machine
+        // someone installing a new browser is likely to have.
+        //
+        // Vela opens the page rather than running the installer: a browser
+        // that silently executes downloaded binaries is not one to trust,
+        // whatever the binary happens to be.
+        const owner = windowFor(sender);
+        owner?.manager.create({ url: 'https://ollama.com/download', active: true });
+
         return {
-          opened: true,
+          opened: owner !== null,
           command:
             PLATFORM === 'win32'
               ? 'winget install Ollama.Ollama'

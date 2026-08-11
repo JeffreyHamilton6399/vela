@@ -4,12 +4,29 @@ import { SEARCH_ENGINES } from '../../shared/search-engines.js';
 import { BANGS } from '../../shared/bangs.js';
 import { PROXY_PRESETS, presetForRules, SUGGESTED_MODELS } from '../../shared/providers.js';
 import type { AssistantStatus } from '../../shared/types/ipc.js';
+import { AccountSection } from './AccountSection.js';
 import { CloseIcon } from './icons.js';
 
 interface SettingsPanelProps {
   settings: Settings;
   onClose: () => void;
 }
+
+/**
+ * Settings grew past the point where one scroll was findable. Each category is
+ * a page of its own, with the list on the left, so nothing is more than one
+ * click away and no section hides below a fold.
+ */
+const CATEGORIES = [
+  { id: 'general', label: 'General' },
+  { id: 'privacy', label: 'Privacy' },
+  { id: 'account', label: 'Account' },
+  { id: 'assistant', label: 'Assistant' },
+  { id: 'network', label: 'VPN & proxy' },
+  { id: 'data', label: 'Your data' },
+] as const;
+
+type CategoryId = (typeof CATEGORIES)[number]['id'];
 
 function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
   return (
@@ -196,6 +213,7 @@ function ModelPicker({
  * hands back verbatim.
  */
 export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.Element {
+  const [category, setCategory] = useState<CategoryId>('general');
   const [importState, setImportState] = useState<string | null>(null);
   const [exported, setExported] = useState<string | null>(null);
 
@@ -230,319 +248,370 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
           </button>
         </header>
 
-        <div className="flex-1 overflow-auto p-2">
-          <div className="flex w-full flex-col gap-2">
-            <Section title="Search">
-              <label className="flex items-center justify-between gap-2 px-1 py-1">
-                <span className="text-[13px] text-ink">Default search engine</span>
-                <select
-                  value={settings.searchEngineId}
-                  onChange={(event) => {
-                    set({ searchEngineId: event.target.value });
-                  }}
-                  className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
-                >
-                  {SEARCH_ENGINES.map((engine) => (
-                    <option key={engine.id} value={engine.id}>
-                      {engine.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
-                Bang shortcuts are resolved on this machine, so{' '}
-                {BANGS.map((b) => `!${b.bang}`).join(', ')} go straight to the site without a search
-                engine seeing the query.
-              </p>
-            </Section>
-
-            <Section title="Appearance">
-              <label className="flex items-center justify-between gap-2 px-1 py-1">
-                <span className="text-[13px] text-ink">Theme</span>
-                <select
-                  value={settings.theme}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value === 'system' || value === 'light' || value === 'dark') {
-                      set({ theme: value });
-                    }
-                  }}
-                  className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
-                >
-                  <option value="system">Follow the system</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
-            </Section>
-
-            <Section title="Privacy">
-              <Toggle
-                label="Block ads and trackers"
-                description="EasyList and EasyPrivacy, compiled into the app at build time. Vela never fetches a filter list at runtime."
-                checked={settings.blockAdsAndTrackers}
-                onChange={(next) => {
-                  set({ blockAdsAndTrackers: next });
+        <div className="flex min-h-0 flex-1">
+          <nav
+            aria-label="Settings categories"
+            className="flex w-[150px] shrink-0 flex-col gap-[2px] border-r border-line bg-raised p-1"
+          >
+            {CATEGORIES.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                aria-current={category === entry.id ? 'page' : undefined}
+                onClick={() => {
+                  setCategory(entry.id);
                 }}
-              />
-              <Toggle
-                label="Force HTTPS"
-                description="Upgrade plain http addresses, and warn before ever falling back."
-                checked={settings.forceHttps}
-                onChange={(next) => {
-                  set({ forceHttps: next });
-                }}
-              />
-              <Toggle
-                label="Strip cross-origin Referer"
-                description="Do not tell a site which other site you came from. Same-origin referers are kept, since they leak nothing new."
-                checked={settings.stripCrossOriginReferer}
-                onChange={(next) => {
-                  set({ stripCrossOriginReferer: next });
-                }}
-              />
-              <Toggle
-                label="Clear cookies, cache and storage on exit"
-                description="Wipes this profile's browsing data every time Vela closes."
-                checked={settings.clearOnExit}
-                onChange={(next) => {
-                  set({ clearOnExit: next });
-                }}
-              />
-              <Toggle
-                label="Check for updates"
-                description="One plain GET to the GitHub Releases feed. No install id, no query parameters, no fingerprint."
-                checked={settings.checkForUpdates}
-                onChange={(next) => {
-                  set({ checkForUpdates: next });
-                }}
-              />
-            </Section>
+                className={`focus-ring rounded-lg px-2 py-1 text-left text-[13px] transition-colors duration-150 ${
+                  category === entry.id
+                    ? 'bg-hover font-medium text-ink'
+                    : 'text-ink-muted hover:bg-hover hover:text-ink'
+                }`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </nav>
 
-            <Section title="Performance">
-              <label className="flex items-center justify-between gap-2 px-1 py-1">
-                <span className="min-w-0 text-[13px] text-ink">
-                  Suspend background tabs after
-                  <span className="block text-[12px] text-ink-muted">
-                    A suspended tab gives its renderer process back and keeps its title and icon.
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  <input
-                    type="number"
-                    min={1}
-                    max={240}
-                    value={settings.suspendAfterMinutes}
-                    onChange={(event) => {
-                      const minutes = Number.parseInt(event.target.value, 10);
-                      if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 240) {
-                        set({ suspendAfterMinutes: minutes });
-                      }
-                    }}
-                    aria-label="Minutes before a background tab is suspended"
-                    className="focus-ring w-[64px] rounded-lg border border-line bg-raised px-1 py-1 text-right text-[13px] text-ink outline-none"
-                  />
-                  <span className="text-[12px] text-ink-muted">min</span>
-                </span>
-              </label>
-            </Section>
-
-            <Section title="Assistant">
-              <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
-                The sidebar assistant runs on a model of your choosing. The default is a model on
-                <em> this machine</em> — no key, no account, and nothing that leaves the computer.
-              </p>
-
-              <div className="flex flex-col gap-1 px-1 py-1">
-                <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
-                  <input
-                    type="radio"
-                    name="assistant-provider"
-                    checked={settings.assistantProvider === 'ollama'}
-                    onChange={() => {
-                      set({ assistantProvider: 'ollama' });
-                    }}
-                    className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-[13px] text-ink">
-                      Local model (Ollama) — recommended
-                    </span>
-                    <span className="block text-[12px] leading-relaxed text-ink-muted">
-                      Talks to Ollama on 127.0.0.1. Install it from ollama.com, then run{' '}
-                      <code>ollama pull {settings.assistantOllamaModel}</code>. No key, and nothing
-                      leaves this machine.
-                    </span>
-                  </span>
-                </label>
-
-                <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
-                  <input
-                    type="radio"
-                    name="assistant-provider"
-                    checked={settings.assistantProvider === 'hosted'}
-                    onChange={() => {
-                      set({ assistantProvider: 'hosted' });
-                    }}
-                    className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-[13px] text-ink">
-                      Hosted service, with your own key
-                    </span>
-                    <span className="block text-[12px] leading-relaxed text-ink-muted">
-                      Faster and larger, but your messages go to that company. Vela ships without a
-                      key: an embedded one would sit in the app bundle for anyone to read.
-                    </span>
-                  </span>
-                </label>
-              </div>
-
-              {settings.assistantProvider === 'ollama' ? (
-                <ModelPicker
-                  selected={settings.assistantOllamaModel}
-                  onSelect={(model) => {
-                    set({ assistantOllamaModel: model });
-                  }}
-                />
-              ) : (
+          <div className="min-h-0 flex-1 overflow-auto p-2">
+            <div className="flex w-full flex-col gap-2">
+              {category === 'general' ? (
                 <>
-                  <label className="flex flex-col gap-[3px] px-1 py-1">
-                    <span className="text-[13px] text-ink">API key</span>
-                    <input
-                      type="password"
-                      value={settings.assistantApiKey}
-                      onChange={(event) => {
-                        set({ assistantApiKey: event.target.value });
-                      }}
-                      placeholder="gsk_…"
-                      spellCheck={false}
-                      autoComplete="off"
-                      className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-[3px] px-1 py-1">
-                    <span className="text-[13px] text-ink">Model</span>
-                    <input
-                      value={settings.assistantHostedModel}
-                      onChange={(event) => {
-                        set({ assistantHostedModel: event.target.value });
-                      }}
-                      spellCheck={false}
-                      className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
-                    />
-                  </label>
+                  <Section title="Search">
+                    <label className="flex items-center justify-between gap-2 px-1 py-1">
+                      <span className="text-[13px] text-ink">Default search engine</span>
+                      <select
+                        value={settings.searchEngineId}
+                        onChange={(event) => {
+                          set({ searchEngineId: event.target.value });
+                        }}
+                        className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
+                      >
+                        {SEARCH_ENGINES.map((engine) => (
+                          <option key={engine.id} value={engine.id}>
+                            {engine.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
+                      Bang shortcuts are resolved on this machine, so{' '}
+                      {BANGS.map((b) => `!${b.bang}`).join(', ')} go straight to the site without a
+                      search engine seeing the query.
+                    </p>
+                  </Section>
+
+                  <Section title="Appearance">
+                    <label className="flex items-center justify-between gap-2 px-1 py-1">
+                      <span className="text-[13px] text-ink">Theme</span>
+                      <select
+                        value={settings.theme}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === 'system' || value === 'light' || value === 'dark') {
+                            set({ theme: value });
+                          }
+                        }}
+                        className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
+                      >
+                        <option value="system">Follow the system</option>
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                      </select>
+                    </label>
+                  </Section>
                 </>
-              )}
-            </Section>
+              ) : null}
 
-            <Section title="Network">
-              <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
-                Vela has no VPN of its own, because it runs no servers. A browser-branded “free VPN”
-                is a company reading your traffic instead of your ISP — a change of audience, not an
-                improvement. What Vela can do is send everything, private windows included, through
-                something you already trust. The free options below are the ones that run on your
-                own machine.
-              </p>
-
-              <Toggle
-                label="Route traffic through a proxy"
-                description="Applies to new page loads in every window."
-                checked={settings.proxyEnabled}
-                onChange={(next) => {
-                  set({ proxyEnabled: next });
-                }}
-              />
-
-              <label className="flex flex-col gap-[3px] px-1 py-1">
-                <span className="text-[13px] text-ink">Connection</span>
-                <select
-                  value={presetForRules(settings.proxyRules).id}
-                  onChange={(event) => {
-                    const preset = PROXY_PRESETS.find((entry) => entry.id === event.target.value);
-                    if (preset === undefined) return;
-                    set({
-                      proxyRules: preset.rules,
-                      proxyEnabled: preset.id !== 'none',
-                    });
-                  }}
-                  className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
-                >
-                  {PROXY_PRESETS.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[11px] leading-relaxed text-ink-muted">
-                  {presetForRules(settings.proxyRules).note}
-                </span>
-              </label>
-
-              <label className="flex flex-col gap-[3px] px-1 py-1">
-                <span className="text-[13px] text-ink">Address</span>
-                <input
-                  value={settings.proxyRules}
-                  onChange={(event) => {
-                    set({ proxyRules: event.target.value });
-                  }}
-                  placeholder="socks5://127.0.0.1:1080"
-                  spellCheck={false}
-                  className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
-                />
-              </label>
-            </Section>
-
-            <Section title="Your data">
-              <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
-                Vela collects nothing. There is no account, no server, and no analytics. Everything
-                it remembers is in one local JSON file, and the button below shows you exactly what
-                is in it.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-1 px-1 pt-1">
-                <button
-                  type="button"
-                  className="focus-ring rounded-lg bg-ink px-2 py-1 text-[13px] font-medium text-surface transition-opacity duration-150 hover:opacity-90"
-                  onClick={() => {
-                    void window.vela.settings.export().then(setExported);
-                  }}
-                >
-                  Export settings
-                </button>
-
-                <label className="focus-ring cursor-pointer rounded-lg border border-line px-2 py-1 text-[13px] text-ink transition-colors duration-150 hover:bg-hover">
-                  Import settings
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file === undefined) return;
-                      void file.text().then(async (json) => {
-                        const result = await window.vela.settings.import(json);
-                        setImportState(result.message);
-                      });
+              {category === 'privacy' ? (
+                <Section title="Privacy">
+                  <Toggle
+                    label="Block ads and trackers"
+                    description="EasyList and EasyPrivacy, compiled into the app at build time. Vela never fetches a filter list at runtime."
+                    checked={settings.blockAdsAndTrackers}
+                    onChange={(next) => {
+                      set({ blockAdsAndTrackers: next });
                     }}
                   />
-                </label>
+                  <Toggle
+                    label="Force HTTPS"
+                    description="Upgrade plain http addresses, and warn before ever falling back."
+                    checked={settings.forceHttps}
+                    onChange={(next) => {
+                      set({ forceHttps: next });
+                    }}
+                  />
+                  <Toggle
+                    label="Strip cross-origin Referer"
+                    description="Do not tell a site which other site you came from. Same-origin referers are kept, since they leak nothing new."
+                    checked={settings.stripCrossOriginReferer}
+                    onChange={(next) => {
+                      set({ stripCrossOriginReferer: next });
+                    }}
+                  />
+                  <Toggle
+                    label="Clear cookies, cache and storage on exit"
+                    description="Wipes this profile's browsing data every time Vela closes."
+                    checked={settings.clearOnExit}
+                    onChange={(next) => {
+                      set({ clearOnExit: next });
+                    }}
+                  />
+                  <Toggle
+                    label="Check for updates"
+                    description="One plain GET to the GitHub Releases feed. No install id, no query parameters, no fingerprint."
+                    checked={settings.checkForUpdates}
+                    onChange={(next) => {
+                      set({ checkForUpdates: next });
+                    }}
+                  />
+                </Section>
+              ) : null}
 
-                {importState === null ? null : (
-                  <span className="text-[12px] text-ink-muted">{importState}</span>
-                )}
-              </div>
+              {category === 'general' ? (
+                <Section title="Performance">
+                  <label className="flex items-center justify-between gap-2 px-1 py-1">
+                    <span className="min-w-0 text-[13px] text-ink">
+                      Suspend background tabs after
+                      <span className="block text-[12px] text-ink-muted">
+                        A suspended tab gives its renderer process back and keeps its title and
+                        icon.
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={240}
+                        value={settings.suspendAfterMinutes}
+                        onChange={(event) => {
+                          const minutes = Number.parseInt(event.target.value, 10);
+                          if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 240) {
+                            set({ suspendAfterMinutes: minutes });
+                          }
+                        }}
+                        aria-label="Minutes before a background tab is suspended"
+                        className="focus-ring w-[64px] rounded-lg border border-line bg-raised px-1 py-1 text-right text-[13px] text-ink outline-none"
+                      />
+                      <span className="text-[12px] text-ink-muted">min</span>
+                    </span>
+                  </label>
+                </Section>
+              ) : null}
 
-              {exported === null ? null : (
-                <textarea
-                  readOnly
-                  value={exported}
-                  aria-label="Exported settings"
-                  className="mt-1 h-[180px] w-full resize-none rounded-lg border border-line bg-raised p-1 font-mono text-[11px] text-ink outline-none"
-                />
-              )}
-            </Section>
+              {category === 'account' ? (
+                <Section title="Vela account">
+                  <AccountSection />
+                </Section>
+              ) : null}
+
+              {category === 'assistant' ? (
+                <Section title="Assistant">
+                  <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
+                    The sidebar assistant runs on a model of your choosing. The default is a model
+                    on
+                    <em> this machine</em> — no key, no account, and nothing that leaves the
+                    computer.
+                  </p>
+
+                  <div className="flex flex-col gap-1 px-1 py-1">
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
+                      <input
+                        type="radio"
+                        name="assistant-provider"
+                        checked={settings.assistantProvider === 'ollama'}
+                        onChange={() => {
+                          set({ assistantProvider: 'ollama' });
+                        }}
+                        className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] text-ink">
+                          Local model (Ollama) — recommended
+                        </span>
+                        <span className="block text-[12px] leading-relaxed text-ink-muted">
+                          Talks to Ollama on 127.0.0.1. Install it from ollama.com, then run{' '}
+                          <code>ollama pull {settings.assistantOllamaModel}</code>. No key, and
+                          nothing leaves this machine.
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
+                      <input
+                        type="radio"
+                        name="assistant-provider"
+                        checked={settings.assistantProvider === 'hosted'}
+                        onChange={() => {
+                          set({ assistantProvider: 'hosted' });
+                        }}
+                        className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] text-ink">
+                          Hosted service, with your own key
+                        </span>
+                        <span className="block text-[12px] leading-relaxed text-ink-muted">
+                          Faster and larger, but your messages go to that company. Vela ships
+                          without a key: an embedded one would sit in the app bundle for anyone to
+                          read.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+
+                  {settings.assistantProvider === 'ollama' ? (
+                    <ModelPicker
+                      selected={settings.assistantOllamaModel}
+                      onSelect={(model) => {
+                        set({ assistantOllamaModel: model });
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <label className="flex flex-col gap-[3px] px-1 py-1">
+                        <span className="text-[13px] text-ink">API key</span>
+                        <input
+                          type="password"
+                          value={settings.assistantApiKey}
+                          onChange={(event) => {
+                            set({ assistantApiKey: event.target.value });
+                          }}
+                          placeholder="gsk_…"
+                          spellCheck={false}
+                          autoComplete="off"
+                          className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-[3px] px-1 py-1">
+                        <span className="text-[13px] text-ink">Model</span>
+                        <input
+                          value={settings.assistantHostedModel}
+                          onChange={(event) => {
+                            set({ assistantHostedModel: event.target.value });
+                          }}
+                          spellCheck={false}
+                          className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
+                        />
+                      </label>
+                    </>
+                  )}
+                </Section>
+              ) : null}
+
+              {category === 'network' ? (
+                <Section title="Network">
+                  <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
+                    Vela has no VPN of its own, because it runs no servers. A browser-branded “free
+                    VPN” is a company reading your traffic instead of your ISP — a change of
+                    audience, not an improvement. What Vela can do is send everything, private
+                    windows included, through something you already trust. The free options below
+                    are the ones that run on your own machine.
+                  </p>
+
+                  <Toggle
+                    label="Route traffic through a proxy"
+                    description="Applies to new page loads in every window."
+                    checked={settings.proxyEnabled}
+                    onChange={(next) => {
+                      set({ proxyEnabled: next });
+                    }}
+                  />
+
+                  <label className="flex flex-col gap-[3px] px-1 py-1">
+                    <span className="text-[13px] text-ink">Connection</span>
+                    <select
+                      value={presetForRules(settings.proxyRules).id}
+                      onChange={(event) => {
+                        const preset = PROXY_PRESETS.find(
+                          (entry) => entry.id === event.target.value,
+                        );
+                        if (preset === undefined) return;
+                        set({
+                          proxyRules: preset.rules,
+                          proxyEnabled: preset.id !== 'none',
+                        });
+                      }}
+                      className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
+                    >
+                      {PROXY_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] leading-relaxed text-ink-muted">
+                      {presetForRules(settings.proxyRules).note}
+                    </span>
+                  </label>
+
+                  <label className="flex flex-col gap-[3px] px-1 py-1">
+                    <span className="text-[13px] text-ink">Address</span>
+                    <input
+                      value={settings.proxyRules}
+                      onChange={(event) => {
+                        set({ proxyRules: event.target.value });
+                      }}
+                      placeholder="socks5://127.0.0.1:1080"
+                      spellCheck={false}
+                      className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
+                    />
+                  </label>
+                </Section>
+              ) : null}
+
+              {category === 'data' ? (
+                <Section title="Your data">
+                  <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
+                    Vela collects nothing. There is no account, no server, and no analytics.
+                    Everything it remembers is in one local JSON file, and the button below shows
+                    you exactly what is in it.
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-1 px-1 pt-1">
+                    <button
+                      type="button"
+                      className="focus-ring rounded-lg bg-ink px-2 py-1 text-[13px] font-medium text-surface transition-opacity duration-150 hover:opacity-90"
+                      onClick={() => {
+                        void window.vela.settings.export().then(setExported);
+                      }}
+                    >
+                      Export settings
+                    </button>
+
+                    <label className="focus-ring cursor-pointer rounded-lg border border-line px-2 py-1 text-[13px] text-ink transition-colors duration-150 hover:bg-hover">
+                      Import settings
+                      <input
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file === undefined) return;
+                          void file.text().then(async (json) => {
+                            const result = await window.vela.settings.import(json);
+                            setImportState(result.message);
+                          });
+                        }}
+                      />
+                    </label>
+
+                    {importState === null ? null : (
+                      <span className="text-[12px] text-ink-muted">{importState}</span>
+                    )}
+                  </div>
+
+                  {exported === null ? null : (
+                    <textarea
+                      readOnly
+                      value={exported}
+                      aria-label="Exported settings"
+                      className="mt-1 h-[180px] w-full resize-none rounded-lg border border-line bg-raised p-1 font-mono text-[11px] text-ink outline-none"
+                    />
+                  )}
+                </Section>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>

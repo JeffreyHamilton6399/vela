@@ -47,6 +47,12 @@ The alternative is a hosted service using **a key you paste into Settings**. Vel
 
 Only the hosted option adds a network destination beyond the two above, which is why it is not the default.
 
+### The account and the password vault
+
+Settings → Account creates a **local** account: an email as a label and a master password that unlocks an encrypted file. The master password is never stored, only a separate scrypt derivation of it, so the file without the password is unreadable. Credentials are AES-256-GCM under a key derived the same way. There is no password reset, because there is nobody to ask.
+
+On a site you have saved, the key button in the address bar fills the login. It does that **when you ask**, not on every page load: filling automatically would mean injecting a Vela script into every website you visit, and Vela's tabs deliberately carry no bridge at all. The fill script is injected into one page at the moment you click, and leaves nothing behind.
+
 ### Web panels
 
 Dock a site into the sidebar from the rail's globe button, the way Opera does. Each panel is an ordinary `WebContentsView` on the same hardened session a tab uses — same sandbox, same blocking, same referer policy, no preload — simply positioned into the sidebar rectangle. Only the visible panel exists; closing it destroys the view rather than leaving a hidden renderer running.
@@ -54,7 +60,7 @@ Dock a site into the sidebar from the rail's globe button, the way Opera does. E
 ### What Vela deliberately does not have
 
 - **No built-in VPN.** A browser-branded "free VPN" is someone else's server seeing all your traffic — the opposite of the point, and it needs infrastructure Vela does not run. Settings has a proxy field instead: point it at a proxy or VPN you already trust and every session goes through it.
-- **No account, no sign-in, no sync.** An email-and-password login that carries your data between installs needs a server holding that data, and an account tying it to you. Vela has neither, on purpose — an account is the single thing that turns "a browser on your machine" into "a profile someone else keeps". Settings → _Export_ hands you the whole JSON file to move yourself.
+- **No hosted account, and no sync between machines.** There is a Vela account, but it is local: signing in unlocks an encrypted file on this computer. Nothing is uploaded, and there is no server to sync with — an account you sign into somewhere else is the single thing that turns "a browser on your machine" into "a profile somebody keeps". Settings → _Export_ moves your settings between machines; the vault stays put.
 
 Not yet: find in page. It is written, but Chromium's `found-in-page` event does not reach a listener registered from the app's own main bundle in this configuration, so it was removed rather than shipped as a search box that never counts matches.
 

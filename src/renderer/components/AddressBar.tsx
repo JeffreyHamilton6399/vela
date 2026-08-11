@@ -1,7 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type JSX, type RefObject } from 'react';
 import { describeAddress, originLabel, resolveAddressInput } from '../../shared/address-input.js';
 import type { TabSnapshot } from '../../shared/types/ipc.js';
-import { LockIcon, SearchIcon, StarIcon, WarningIcon } from './icons.js';
+import { KeyIcon, LockIcon, SearchIcon, StarIcon, WarningIcon } from './icons.js';
 
 export interface AddressBarHandle {
   focus: () => void;
@@ -58,6 +58,7 @@ export function AddressBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
+  const [fillNote, setFillNote] = useState<string | null>(null);
 
   const url = tab?.url ?? '';
 
@@ -106,7 +107,7 @@ export function AddressBar({
         spellCheck={false}
         autoComplete="off"
         aria-label="Address and search"
-        placeholder="Search or enter an address"
+        placeholder={fillNote ?? 'Search or enter an address'}
         className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-muted"
         onChange={(event) => {
           setValue(event.target.value);
@@ -131,6 +132,23 @@ export function AddressBar({
           }
         }}
       />
+      {tab !== null && tab.internal === null && tab.url !== '' ? (
+        <button
+          type="button"
+          aria-label="Fill saved login"
+          title="Fill the saved login for this site"
+          onClick={() => {
+            void window.vela.account.fill(tab.id).then((result) => {
+              setFillNote(result.ok ? null : result.error);
+              if (result.ok) setFillNote(null);
+            });
+          }}
+          className="focus-ring shrink-0 rounded-lg p-[2px] text-ink-muted transition-colors duration-150 hover:text-ink"
+        >
+          <KeyIcon width={14} height={14} />
+        </button>
+      ) : null}
+
       {tab !== null && tab.internal === null && tab.url !== '' ? (
         <button
           type="button"

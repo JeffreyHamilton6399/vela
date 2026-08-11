@@ -9,6 +9,7 @@ import {
   type HistoryEntry,
 } from '../../shared/types/ipc.js';
 import type { SettingsStore } from '../settings/store.js';
+import type { Vault } from '../account/vault.js';
 import { addTile, moveTile, normalizeUrl, removeTile } from '../speed-dial.js';
 import { randomUUID } from 'node:crypto';
 import { addBookmark, moveBookmark, removeBookmark } from '../../shared/bookmarks.js';
@@ -32,8 +33,11 @@ export interface SettingsIpcDeps extends GuardOptions {
   };
   /** Icon already on this machine for a URL, or null. Never fetches. */
   cachedFavicon: (url: string) => string | null;
+  vault: Vault;
+  /** Fills the saved login into the page of a tab the user is looking at. */
+  fillLogin: (sender: unknown, tabId: string) => Promise<{ ok: boolean; error: string | null; filled: number }>;
   /** Opens Ollama's download page. Vela never runs an installer itself. */
-  openOllamaDownload: () => Promise<{ opened: boolean; command: string }>;
+  openOllamaDownload: (sender: unknown) => { opened: boolean; command: string };
   downloads: {
     list: (sender: unknown) => DownloadItem[];
     open: (sender: unknown, id: string) => void;
@@ -91,7 +95,45 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
     askAssistant(assistantConfig(deps), messages),
   );
 
-  handleInvoke(deps, INVOKE_CHANNELS.assistantInstall, async () => deps.openOllamaDownload());
+  handleInvoke(deps, INVOKE_CHANNELS.accountState, () => ({
+    exists: deps.vault.exists,
+    unlocked: deps.vault.unlocked,
+    email: deps.vault.email,
+  }));
+
+  handleInvoke(deps, INVOKE_CHANNELS.accountCreate, ({ email, masterPassword }) =>
+    deps.vault.create(email, masterPassword),
+  );
+
+  handleInvoke(deps, INVOKE_CHANNELS.accountUnlock, ({ masterPassword }) =>
+    deps.vault.unlock(masterPassword),
+  );
+
+  handleInvoke(deps, INVOKE_CHANNELS.accountLock, () => {
+    deps.vault.lock();
+    return true;
+  });
+
+  handleInvoke(deps, INVOKE_CHANNELS.vaultList, () => deps.vault.list());
+
+  handleInvoke(deps, INVOKE_CHANNELS.vaultSave, ({ host, username, password }) => {
+    if (!deps.vault.unlocked) return { ok: false, error: 'Sign in first.' };
+    const saved = deps.vault.save(host, username, password);
+    return saved ? { ok: true, error: null } : { ok: false, error: 'Could not save.' };
+  });
+
+  handleInvoke(deps, INVOKE_CHANNELS.vaultRemove, ({ id }) => {
+    deps.vault.remove(id);
+    return true;
+  });
+
+  handleInvoke(deps, INVOKE_CHANNELS.vaultFill, async ({ tabId }, sender) =>
+    deps.fillLogin(sender, tabId),
+  );
+
+  handleInvoke(deps, INVOKE_CHANNELS.assistantInstall, (_payload, sender) =>
+    deps.openOllamaDownload(sender),
+  );
 
   handleInvoke(deps, INVOKE_CHANNELS.assistantPull, async ({ model }) => pullOllamaModel(model));
 

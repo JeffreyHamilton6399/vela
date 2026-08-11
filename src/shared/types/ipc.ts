@@ -59,6 +59,24 @@ export const assistantStatusSchema = z.object({
 });
 export type AssistantStatus = z.infer<typeof assistantStatusSchema>;
 
+export const accountStateSchema = z.object({
+  exists: z.boolean(),
+  unlocked: z.boolean(),
+  email: z.string(),
+});
+export type AccountState = z.infer<typeof accountStateSchema>;
+
+export const vaultEntrySchema = z.object({
+  id: z.string(),
+  host: z.string(),
+  username: z.string(),
+  updatedAt: z.number(),
+});
+export type VaultEntry = z.infer<typeof vaultEntrySchema>;
+
+export const actionResultSchema = z.object({ ok: z.boolean(), error: z.string().nullable() });
+export type ActionResult = z.infer<typeof actionResultSchema>;
+
 export const settingsImportResultSchema = z.object({
   ok: z.boolean(),
   message: z.string(),
@@ -204,6 +222,14 @@ export const INVOKE_CHANNELS = {
   assistantStatus: 'assistant:status',
   assistantPull: 'assistant:pull',
   assistantInstall: 'assistant:install',
+  accountState: 'account:state',
+  accountCreate: 'account:create',
+  accountUnlock: 'account:unlock',
+  accountLock: 'account:lock',
+  vaultList: 'vault:list',
+  vaultSave: 'vault:save',
+  vaultRemove: 'vault:remove',
+  vaultFill: 'vault:fill',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -294,6 +320,30 @@ export const invokeContract = {
   },
   [INVOKE_CHANNELS.historyClear]: { request: emptySchema, response: z.boolean() },
   [INVOKE_CHANNELS.assistantStatus]: { request: emptySchema, response: assistantStatusSchema },
+  [INVOKE_CHANNELS.accountState]: { request: emptySchema, response: accountStateSchema },
+  [INVOKE_CHANNELS.accountCreate]: {
+    request: z.object({ email: z.string().max(320), masterPassword: z.string().max(500) }),
+    response: actionResultSchema,
+  },
+  [INVOKE_CHANNELS.accountUnlock]: {
+    request: z.object({ masterPassword: z.string().max(500) }),
+    response: actionResultSchema,
+  },
+  [INVOKE_CHANNELS.accountLock]: { request: emptySchema, response: z.boolean() },
+  [INVOKE_CHANNELS.vaultList]: { request: emptySchema, response: z.array(vaultEntrySchema) },
+  [INVOKE_CHANNELS.vaultSave]: { request: z.object({
+      host: z.string().min(1).max(255),
+      username: z.string().max(255),
+      password: z.string().max(500),
+    }), response: actionResultSchema },
+  [INVOKE_CHANNELS.vaultRemove]: {
+    request: z.object({ id: z.string().max(600) }),
+    response: z.boolean(),
+  },
+  [INVOKE_CHANNELS.vaultFill]: {
+    request: z.object({ tabId: tabIdString }),
+    response: z.object({ ok: z.boolean(), error: z.string().nullable(), filled: z.number() }),
+  },
   [INVOKE_CHANNELS.assistantInstall]: {
     request: emptySchema,
     response: z.object({ opened: z.boolean(), command: z.string() }),
@@ -465,6 +515,18 @@ export interface VelaBridge {
     cancel(id: string): void;
     clear(): void;
     onChanged(listener: (items: DownloadItem[]) => void): () => void;
+  };
+  readonly account: {
+    state(): Promise<AccountState>;
+    /** Creates the local account. There is no server and nothing is sent. */
+    create(email: string, masterPassword: string): Promise<ActionResult>;
+    unlock(masterPassword: string): Promise<ActionResult>;
+    lock(): Promise<boolean>;
+    list(): Promise<VaultEntry[]>;
+    save(host: string, username: string, password: string): Promise<ActionResult>;
+    remove(id: string): Promise<boolean>;
+    /** Fills the saved login into the page in this tab, when asked. */
+    fill(tabId: string): Promise<{ ok: boolean; error: string | null; filled: number }>;
   };
   readonly assistant: {
     /** Uses the key in the local settings file; there is no shipped key. */
