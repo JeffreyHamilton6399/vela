@@ -75,6 +75,21 @@ export const GridIcon = (props: IconProps): JSX.Element => (
   <Icon shape="M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z" {...props} />
 );
 
+export const DownloadIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M8 2v8M4.5 7 8 10.5 11.5 7M3 13h10" {...props} />
+);
+
+export const StarIcon = (props: IconProps): JSX.Element => (
+  <Icon
+    shape="M8 2.5l1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.2l-3.4 1.8.7-3.8L2.5 6.5l3.8-.5z"
+    {...props}
+  />
+);
+
+export const ClockIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM8 5v3.2l2.2 1.3" {...props} />
+);
+
 export const SettingsIcon = (props: IconProps): JSX.Element => (
   <Icon
     shape="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 1.5v1.6M8 12.9v1.6M2.9 2.9l1.1 1.1M12 12l1.1 1.1M1.5 8h1.6M12.9 8h1.6M2.9 13.1 4 12M12 4l1.1-1.1"

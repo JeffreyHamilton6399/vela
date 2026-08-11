@@ -18,6 +18,15 @@ export const speedDialTileSchema = z.object({
 });
 export type SpeedDialTile = z.infer<typeof speedDialTileSchema>;
 
+export const bookmarkSchema = z.object({
+  id: z.string().min(1).max(64),
+  title: z.string().max(200),
+  url: z.string().max(4096),
+  /** A locally cached favicon as a data URL. Never a remote address. */
+  icon: z.string().max(200_000).nullable(),
+});
+export type Bookmark = z.infer<typeof bookmarkSchema>;
+
 export const workspaceSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(60),
@@ -49,6 +58,21 @@ export const settingsSchema = z.object({
 
   /** Minutes a background tab may idle before it is suspended. */
   suspendAfterMinutes: z.number().int().min(1).max(240).default(5),
+
+  /** False until the first-run screen has been dismissed. */
+  onboardingComplete: z.boolean().default(false),
+
+  bookmarks: z.array(bookmarkSchema).default([]),
+  showBookmarksBar: z.boolean().default(true),
+
+  /**
+   * Per-host zoom, as Chromium zoom levels (0 is 100%, each step is ~1.2x).
+   * Keyed by host so a site stays at the size you left it.
+   */
+  zoomLevels: z.record(z.string().max(255), z.number().min(-8).max(9)).default({}),
+
+  /** Whether to keep local browsing history at all. */
+  keepHistory: z.boolean().default(true),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -70,6 +94,9 @@ export const settingsPatchSchema = z.object({
   clearOnExit: z.boolean().optional(),
   checkForUpdates: z.boolean().optional(),
   suspendAfterMinutes: z.number().int().min(1).max(240).optional(),
+  onboardingComplete: z.boolean().optional(),
+  showBookmarksBar: z.boolean().optional(),
+  keepHistory: z.boolean().optional(),
 });
 
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;

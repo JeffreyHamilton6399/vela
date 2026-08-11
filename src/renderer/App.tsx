@@ -2,7 +2,11 @@ import { lazy, Suspense, useCallback, useMemo, useRef, useState, type JSX } from
 import type { Settings } from '../shared/settings.js';
 import { findSearchEngine } from '../shared/search-engines.js';
 import type { AddressBarHandle } from './components/AddressBar.js';
+import { findBookmark } from '../shared/bookmarks.js';
 import { BlockedCount } from './components/BlockedCount.js';
+import { BookmarksBar } from './components/BookmarksBar.js';
+import { DownloadsPanel, useDownloads } from './components/DownloadsPanel.js';
+import { Onboarding } from './components/Onboarding.js';
 import { IconButton } from './components/IconButton.js';
 import { InsecureInterstitial } from './components/InsecureInterstitial.js';
 import { NewTabPage } from './components/NewTabPage.js';
@@ -10,7 +14,7 @@ import type { SidebarTool } from './components/Sidebar.js';
 import { TitleBar } from './components/TitleBar.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
-import { SettingsIcon, SidebarIcon } from './components/icons.js';
+import { DownloadIcon, SettingsIcon, SidebarIcon } from './components/icons.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
@@ -69,6 +73,11 @@ export function App(): JSX.Element {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [downloadsOpen, setDownloadsOpen] = useState(false);
+
+  const downloads = useDownloads();
+  const activeDownloads = downloads.filter((item) => item.state === 'progressing').length;
+  const bookmark = tab === null ? null : findBookmark(settings.bookmarks, tab.url);
 
   useContentInsets(contentRef);
   // Any of these owns the content region, so the page underneath is hidden
@@ -79,6 +88,7 @@ export function App(): JSX.Element {
     setPaletteOpen(false);
     setSettingsOpen(false);
     setPrivacyOpen(false);
+    setDownloadsOpen(false);
   }, []);
 
   const actions = useMemo(
@@ -115,6 +125,12 @@ export function App(): JSX.Element {
       <Toolbar
         tab={tab}
         searchEngineId={settings.searchEngineId}
+        bookmarked={bookmark !== null}
+        onToggleBookmark={() => {
+          if (tab === null) return;
+          if (bookmark === null) window.vela.bookmarks.add(tab.url, tab.title);
+          else window.vela.bookmarks.remove(bookmark.id);
+        }}
         addressRef={addressRef}
         trailing={
           <>
@@ -124,6 +140,19 @@ export function App(): JSX.Element {
                 setPrivacyOpen(true);
               }}
             />
+            <IconButton
+              label={
+                activeDownloads > 0
+                  ? `Downloads — ${String(activeDownloads)} in progress`
+                  : 'Downloads'
+              }
+              onClick={() => {
+                setDownloadsOpen((open) => !open);
+              }}
+              className={activeDownloads > 0 ? 'text-ink' : ''}
+            >
+              <DownloadIcon />
+            </IconButton>
             <IconButton
               label="Toggle sidebar"
               onClick={() => {
@@ -144,6 +173,10 @@ export function App(): JSX.Element {
         }
       />
 
+      {settings.showBookmarksBar ? (
+        <BookmarksBar bookmarks={settings.bookmarks} tabId={browser.activeTabId} />
+      ) : null}
+
       <UpdateBanner state={update} />
 
       <Suspense fallback={null}>
@@ -155,6 +188,17 @@ export function App(): JSX.Element {
             className="relative min-h-0 min-w-0 flex-1 bg-surface"
           >
             <ContentRegion tab={tab} settings={settings} />
+
+            {downloadsOpen ? (
+              <DownloadsPanel
+                items={downloads}
+                onClose={() => {
+                  setDownloadsOpen(false);
+                }}
+              />
+            ) : null}
+
+            {settings.onboardingComplete ? null : <Onboarding settings={settings} />}
 
             {settingsOpen ? (
               <SettingsPanel

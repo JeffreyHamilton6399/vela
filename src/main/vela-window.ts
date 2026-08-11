@@ -6,6 +6,8 @@ import type { SettingsStore } from './settings/store.js';
 import type { Workspace } from '../shared/settings.js';
 import type { BlockerHandle } from './privacy/adblock.js';
 import type { FaviconCache } from './favicons/favicon-cache.js';
+import type { HistoryStore } from './history/history-store.js';
+import { DownloadManager } from './downloads/download-manager.js';
 import { hardenSession } from './privacy/session-hardening.js';
 import { createWindowOptions } from './window-options.js';
 import { readWindowState } from './ipc/register-window-ipc.js';
@@ -23,6 +25,7 @@ export interface VelaWindowOptions {
   settings: SettingsStore;
   blocker: BlockerHandle | null;
   favicons: FaviconCache | null;
+  history: HistoryStore | null;
   onClosed: (window: VelaWindow) => void;
   onUnexpectedRequest: (url: string) => void;
 }
@@ -47,6 +50,7 @@ export class VelaWindow {
   readonly manager: TabManager;
   readonly session: Session;
   readonly isPrivate: boolean;
+  readonly downloads: DownloadManager;
 
   private blockedTotal = 0;
   private readonly disposers: (() => void)[] = [];
@@ -75,6 +79,10 @@ export class VelaWindow {
       }),
     );
 
+    this.downloads = new DownloadManager(this.session, (items) => {
+      this.send(EVENT_CHANNELS.downloadsChanged, items);
+    });
+
     this.manager = new TabManager({
       window: this.window,
       session: this.session,
@@ -99,6 +107,25 @@ export class VelaWindow {
         options.settings.update({ workspaces, activeWorkspaceId: activeId });
       },
       getIdleMinutes: () => options.settings.current.suspendAfterMinutes,
+      recordVisit: (url, title) => {
+        // A private window is never recorded, whatever the setting says.
+        if (options.isPrivate || !options.settings.current.keepHistory) return;
+        options.history?.record(url, title);
+      },
+      // Read through Object.entries rather than by index: a host is arbitrary
+      // text from a page and never indexes into an object Vela owns.
+      getZoomForHost: (host) =>
+        Object.entries(options.settings.current.zoomLevels).find(([key]) => key === host)?.[1] ?? 0,
+      setZoomForHost: (host, level) => {
+        // Rebuilt rather than mutated: a host is arbitrary text from a page,
+        // so it never indexes into an object Vela owns.
+        const levels = Object.fromEntries(
+          Object.entries(options.settings.current.zoomLevels).filter(([key]) => key !== host),
+        );
+        options.settings.update({
+          zoomLevels: level === 0 ? levels : { ...levels, [host]: level },
+        });
+      },
       isPrivate: options.isPrivate,
     });
 
@@ -223,6 +250,7 @@ export class VelaWindow {
     for (const dispose of this.disposers) dispose();
     this.disposers.length = 0;
     this.manager.dispose();
+    this.downloads.dispose();
 
     if (this.isPrivate) {
       void this.session.clearStorageData();

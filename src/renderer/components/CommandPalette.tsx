@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import type { HistoryEntry } from '../../shared/types/ipc.js';
 import { displayUrl } from '../../shared/address-input.js';
 import type { BrowserState } from '../../shared/types/ipc.js';
 import { SearchIcon } from './icons.js';
@@ -135,8 +136,10 @@ export function CommandPalette({
 }: CommandPaletteProps): JSX.Element {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const activeTabId = browser.activeTabId;
   const commands = useCommands(browser, { onOpenSettings, onToggleSidebar, onClose });
 
   const matches = useMemo(() => {
@@ -148,8 +151,22 @@ export function CommandPalette({
       .filter((entry): entry is { command: Command; rank: number } => entry.rank !== null)
       .sort((a, b) => a.rank - b.rank);
 
-    return scored.slice(0, 12).map((entry) => entry.command);
-  }, [commands, query]);
+    const fromCommands = scored.slice(0, 8).map((entry) => entry.command);
+
+    const fromHistory: Command[] = history
+      .filter((entry) => !fromCommands.some((command) => command.hint === displayUrl(entry.url)))
+      .map((entry) => ({
+        id: `history-${entry.url}`,
+        label: entry.title === '' ? displayUrl(entry.url) : entry.title,
+        hint: displayUrl(entry.url),
+        group: 'History',
+        run: () => {
+          if (activeTabId !== null) window.vela.tabs.navigate(activeTabId, entry.url);
+        },
+      }));
+
+    return [...fromCommands, ...fromHistory];
+  }, [commands, query, history, activeTabId]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -159,7 +176,27 @@ export function CommandPalette({
     setSelected(0);
   }, [query]);
 
-  const activeId = browser.activeTabId;
+  // Local history, searched on this machine. Debounced so a fast typist does
+  // not send a query per keystroke.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed === '') {
+      setHistory([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      void window.vela.history.search(trimmed, 6).then((entries) => {
+        if (active) setHistory(entries);
+      });
+    }, 120);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   const runSelected = (): void => {
     const command = matches.at(selected);
@@ -170,8 +207,8 @@ export function CommandPalette({
     }
 
     // Nothing matched: treat it as an address, exactly as the address bar would.
-    if (query.trim() !== '' && activeId !== null) {
-      window.vela.tabs.navigate(activeId, query);
+    if (query.trim() !== '' && activeTabId !== null) {
+      window.vela.tabs.navigate(activeTabId, query);
       onClose();
     }
   };

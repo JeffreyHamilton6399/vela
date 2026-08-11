@@ -1,7 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type JSX, type RefObject } from 'react';
 import { displayUrl, originLabel, resolveAddressInput } from '../../shared/address-input.js';
 import type { TabSnapshot } from '../../shared/types/ipc.js';
-import { LockIcon, SearchIcon, WarningIcon } from './icons.js';
+import { LockIcon, SearchIcon, StarIcon, WarningIcon } from './icons.js';
 
 export interface AddressBarHandle {
   focus: () => void;
@@ -10,8 +10,10 @@ export interface AddressBarHandle {
 interface AddressBarProps {
   tab: TabSnapshot | null;
   searchEngineId: string;
+  bookmarked: boolean;
   handleRef: RefObject<AddressBarHandle | null>;
   onNavigate: (input: string) => void;
+  onToggleBookmark: () => void;
 }
 
 /** The leading glyph: what this address actually is. */
@@ -48,8 +50,10 @@ function Indicator({
 export function AddressBar({
   tab,
   searchEngineId,
+  bookmarked,
   handleRef,
   onNavigate,
+  onToggleBookmark,
 }: AddressBarProps): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -79,6 +83,20 @@ export function AddressBar({
       }}
     >
       <Indicator url={url} editing={editing} input={value} searchEngineId={searchEngineId} />
+
+      {tab !== null && tab.zoomPercent !== 100 ? (
+        <button
+          type="button"
+          title={`Zoom ${String(tab.zoomPercent)}% — click to reset`}
+          aria-label={`Reset zoom, currently ${String(tab.zoomPercent)} percent`}
+          onClick={() => {
+            window.vela.zoom.set(tab.id, 'reset');
+          }}
+          className="focus-ring shrink-0 rounded-full border border-line px-1 text-[11px] tabular-nums text-ink-muted hover:text-ink"
+        >
+          {tab.zoomPercent}%
+        </button>
+      ) : null}
 
       <input
         ref={inputRef}
@@ -111,6 +129,21 @@ export function AddressBar({
           }
         }}
       />
+      {tab !== null && tab.internal === null && tab.url !== '' ? (
+        <button
+          type="button"
+          aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+          title={bookmarked ? 'Bookmarked — click to remove' : 'Bookmark this page'}
+          onClick={() => {
+            onToggleBookmark();
+          }}
+          className={`focus-ring shrink-0 rounded-lg p-[2px] transition-colors duration-150 ${
+            bookmarked ? 'text-ink' : 'text-ink-muted hover:text-ink'
+          }`}
+        >
+          <StarIcon width={14} height={14} fill={bookmarked ? 'currentColor' : 'none'} />
+        </button>
+      ) : null}
     </form>
   );
 }

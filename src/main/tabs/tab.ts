@@ -10,6 +10,8 @@ export interface TabEvents {
   onOpenInNewTab: (url: string, opener: Tab) => void;
   /** Resolves a locally cached icon for a page; remote icons never reach the UI. */
   resolveFavicon: (pageUrl: string, iconUrl: string) => void;
+  /** A completed top-level navigation: history and per-host zoom hang off this. */
+  onNavigated: (tab: Tab) => void;
   /**
    * Vets a navigation before it happens. Returning a different URL upgrades
    * it; returning null shows the plain-http interstitial instead.
@@ -63,6 +65,7 @@ export class Tab {
   private loading = false;
   private currentUrl = BLANK;
   private blocked = 0;
+  private zoomLevel = 0;
   private readonly events: TabEvents;
 
   constructor(private readonly init: TabInit) {
@@ -167,6 +170,7 @@ export class Tab {
       pinned: this.pinned,
       internal: this.internal,
       suspended: this.suspended,
+      zoomPercent: this.zoomPercent,
       workspaceId: this.workspaceId,
       blockedCount: this.blocked,
     };
@@ -268,6 +272,25 @@ export class Tab {
 
   /* ----------------------------------------------------------------- */
 
+  /* ----------------------------------------------------------------- */
+  /* Zoom                                                               */
+  /* ----------------------------------------------------------------- */
+
+  /** Chromium zoom: the factor is 1.2^level, so 0 is 100%. */
+  get zoomPercent(): number {
+    return Math.round(1.2 ** this.zoomLevel * 100);
+  }
+
+  get zoomLevelValue(): number {
+    return this.zoomLevel;
+  }
+
+  applyZoomLevel(level: number): void {
+    this.zoomLevel = level;
+    this.webContents?.setZoomLevel(level);
+    this.changed();
+  }
+
   /** Called once a locally cached icon exists for this tab's page. */
   setCachedFavicon(dataUrl: string | null): void {
     if (this.faviconUrl === dataUrl) return;
@@ -348,6 +371,7 @@ export class Tab {
     contents.on('did-navigate', (_event, url) => {
       this.currentUrl = url;
       this.changed();
+      this.events.onNavigated(this);
     });
 
     contents.on('did-navigate-in-page', (_event, url, isMainFrame) => {

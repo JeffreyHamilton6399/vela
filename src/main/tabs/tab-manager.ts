@@ -38,7 +38,20 @@ export interface TabManagerOptions {
   getWorkspaces: () => readonly Workspace[];
   setWorkspaces: (workspaces: Workspace[], activeId: string) => void;
   getIdleMinutes: () => number;
+  /** Records a visit. A private window passes a no-op.  */
+  recordVisit: (url: string, title: string) => void;
+  /** Chromium zoom level remembered for a host, or 0. */
+  getZoomForHost: (host: string) => number;
+  setZoomForHost: (host: string, level: number) => void;
   isPrivate: boolean;
+}
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host || null;
+  } catch {
+    return null;
+  }
 }
 
 const MAX_CLOSED_HISTORY = 25;
@@ -189,6 +202,10 @@ export class TabManager {
           this.create({ url, active: true, openerId: opener.id });
         },
         vetNavigation: (url) => this.vetNavigation(url),
+        onNavigated: (navigated) => {
+          this.applyStoredZoom(navigated);
+          this.options.recordVisit(navigated.url, navigated.snapshot().title);
+        },
         resolveFavicon: (pageUrl, iconUrl) => {
           void this.options.resolveFavicon(pageUrl, iconUrl).then((dataUrl) => {
             // The tab may have navigated on while the icon downloaded.
@@ -492,6 +509,35 @@ export class TabManager {
     tab.loadUrl(intent.url);
     if (this.activeId === id) this.attach(tab);
     this.notify();
+  }
+
+  /* ----------------------------------------------------------------- */
+  /* Zoom                                                               */
+  /* ----------------------------------------------------------------- */
+
+  /** Steps the zoom for this tab and remembers it for the whole host. */
+  setZoom(id: string, direction: 'in' | 'out' | 'reset'): void {
+    const tab = this.find(id);
+    if (tab === null) return;
+
+    const current = tab.zoomLevelValue;
+    const next =
+      direction === 'reset'
+        ? 0
+        : Math.min(9, Math.max(-8, current + (direction === 'in' ? 1 : -1)));
+
+    tab.applyZoomLevel(next);
+
+    const host = hostOf(tab.url);
+    if (host !== null) this.options.setZoomForHost(host, next);
+    this.notify();
+  }
+
+  /** Restores the zoom the user last chose for this host. */
+  private applyStoredZoom(tab: Tab): void {
+    const host = hostOf(tab.url);
+    const level = host === null ? 0 : this.options.getZoomForHost(host);
+    if (level !== tab.zoomLevelValue) tab.applyZoomLevel(level);
   }
 
   goBack(id: string): void {

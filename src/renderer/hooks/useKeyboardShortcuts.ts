@@ -54,6 +54,19 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
 
       if (mod && !event.shiftKey) {
         switch (key) {
+          case '=':
+          case '+':
+            event.preventDefault();
+            if (activeId !== null) window.vela.zoom.set(activeId, 'in');
+            return;
+          case '-':
+            event.preventDefault();
+            if (activeId !== null) window.vela.zoom.set(activeId, 'out');
+            return;
+          case '0':
+            event.preventDefault();
+            if (activeId !== null) window.vela.zoom.set(activeId, 'reset');
+            return;
           case 'k':
             event.preventDefault();
             actions.togglePalette();

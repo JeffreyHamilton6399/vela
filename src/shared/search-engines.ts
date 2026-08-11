@@ -8,12 +8,18 @@ export interface SearchEngine {
   readonly id: string;
   readonly name: string;
   readonly template: string;
+  /** Shown on the first-run screen, so the choice is an informed one. */
+  readonly blurb: string;
+  /** True when the engine does not build a profile from your searches. */
+  readonly tracks: boolean;
 }
 
 const DUCKDUCKGO: SearchEngine = {
   id: 'duckduckgo',
   name: 'DuckDuckGo',
   template: 'https://duckduckgo.com/?q={query}',
+  blurb: 'No search history, no profile. Vela’s default.',
+  tracks: false,
 };
 
 export const SEARCH_ENGINES: readonly SearchEngine[] = [
@@ -22,10 +28,37 @@ export const SEARCH_ENGINES: readonly SearchEngine[] = [
     id: 'startpage',
     name: 'Startpage',
     template: 'https://www.startpage.com/sp/search?query={query}',
+    blurb: 'Google’s results, fetched on your behalf and stripped of your identity.',
+    tracks: false,
   },
-  { id: 'brave', name: 'Brave Search', template: 'https://search.brave.com/search?q={query}' },
-  { id: 'ecosia', name: 'Ecosia', template: 'https://www.ecosia.org/search?q={query}' },
-  { id: 'google', name: 'Google', template: 'https://www.google.com/search?q={query}' },
+  {
+    id: 'brave',
+    name: 'Brave Search',
+    template: 'https://search.brave.com/search?q={query}',
+    blurb: 'An independent index. No profiling.',
+    tracks: false,
+  },
+  {
+    id: 'ecosia',
+    name: 'Ecosia',
+    template: 'https://www.ecosia.org/search?q={query}',
+    blurb: 'Bing’s results; profits go to planting trees.',
+    tracks: true,
+  },
+  {
+    id: 'google',
+    name: 'Google',
+    template: 'https://www.google.com/search?q={query}',
+    blurb: 'The results most people expect. Logs your searches and builds a profile.',
+    tracks: true,
+  },
+  {
+    id: 'bing',
+    name: 'Bing',
+    template: 'https://www.bing.com/search?q={query}',
+    blurb: 'Microsoft’s index. Logs your searches and builds a profile.',
+    tracks: true,
+  },
 ];
 
 export const DEFAULT_SEARCH_ENGINE_ID = DUCKDUCKGO.id;

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { SpeedDialTile } from '../shared/settings.js';
+import { normalizeUrl } from '../shared/url.js';
+export { normalizeUrl };
 
 const MAX_TILES = 24;
 
@@ -73,15 +75,4 @@ export function moveTile(
 
   const rest = tiles.filter((tile) => tile.id !== id);
   return [...rest.slice(0, target), moving, ...rest.slice(target)];
-}
-
-/** Only http(s) tiles: a Speed Dial is not a place to stash a file: URL. */
-export function normalizeUrl(raw: string): string | null {
-  try {
-    const parsed = new URL(raw.includes('://') ? raw : `https://${raw}`);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
 }

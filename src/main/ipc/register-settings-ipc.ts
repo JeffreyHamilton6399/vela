@@ -5,9 +5,13 @@ import {
   type PrivacyReport,
   type SettingsImportResult,
   type UpdateState,
+  type DownloadItem,
+  type HistoryEntry,
 } from '../../shared/types/ipc.js';
 import type { SettingsStore } from '../settings/store.js';
 import { addTile, moveTile, normalizeUrl, removeTile } from '../speed-dial.js';
+import { randomUUID } from 'node:crypto';
+import { addBookmark, moveBookmark, removeBookmark } from '../../shared/bookmarks.js';
 import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js';
 
 export interface SettingsIpcDeps extends GuardOptions {
@@ -22,6 +26,17 @@ export interface SettingsIpcDeps extends GuardOptions {
   };
   /** Icon already on this machine for a URL, or null. Never fetches. */
   cachedFavicon: (url: string) => string | null;
+  downloads: {
+    list: (sender: unknown) => DownloadItem[];
+    open: (sender: unknown, id: string) => void;
+    showInFolder: (sender: unknown, id: string) => void;
+    cancel: (sender: unknown, id: string) => void;
+    clear: (sender: unknown) => void;
+  };
+  history: {
+    search: (query: string, limit: number) => HistoryEntry[];
+    clear: () => void;
+  };
 }
 
 const FALLBACK: Settings = settingsSchema.parse({});
@@ -77,6 +92,61 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
 
   handleSend(deps, SEND_CHANNELS.updatesInstall, () => {
     deps.updater.install();
+  });
+
+  handleInvoke(deps, INVOKE_CHANNELS.downloadsGet, (_payload, sender) =>
+    deps.downloads.list(sender),
+  );
+
+  handleInvoke(deps, INVOKE_CHANNELS.historySearch, ({ query, limit }) =>
+    deps.history.search(query, limit),
+  );
+
+  handleInvoke(deps, INVOKE_CHANNELS.historyClear, () => {
+    deps.history.clear();
+    return true;
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsOpen, ({ id }, sender) => {
+    deps.downloads.open(sender, id);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsShow, ({ id }, sender) => {
+    deps.downloads.showInFolder(sender, id);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsCancel, ({ id }, sender) => {
+    deps.downloads.cancel(sender, id);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsClear, (_payload, sender) => {
+    deps.downloads.clear(sender);
+  });
+
+  handleSend(deps, SEND_CHANNELS.bookmarksAdd, ({ url, title }) => {
+    const store = deps.getStore();
+    if (store === null) return;
+    store.update({
+      bookmarks: addBookmark(
+        store.current.bookmarks,
+        url,
+        title,
+        deps.cachedFavicon(url),
+        randomUUID,
+      ),
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.bookmarksRemove, ({ id }) => {
+    const store = deps.getStore();
+    if (store === null) return;
+    store.update({ bookmarks: removeBookmark(store.current.bookmarks, id) });
+  });
+
+  handleSend(deps, SEND_CHANNELS.bookmarksMove, ({ id, toIndex }) => {
+    const store = deps.getStore();
+    if (store === null) return;
+    store.update({ bookmarks: moveBookmark(store.current.bookmarks, id, toIndex) });
   });
 
   handleSend(deps, SEND_CHANNELS.toolsSetNotes, ({ text }) => {

@@ -13,6 +13,7 @@ import { clearBrowsingData } from './privacy/session-hardening.js';
 import { SettingsStore } from './settings/store.js';
 import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
+import { HistoryStore } from './history/history-store.js';
 import { startDevMetrics } from './dev-metrics.js';
 import { SURFACE } from './window-options.js';
 import { VelaWindow } from './vela-window.js';
@@ -49,6 +50,7 @@ let settings: SettingsStore | null = null;
 let blocker: BlockerHandle | null = null;
 let favicons: FaviconCache | null = null;
 let updater: Updater | null = null;
+let history: HistoryStore | null = null;
 
 function getAppInfo(): AppInfo {
   return {
@@ -97,6 +99,7 @@ function createWindow(options: { isPrivate: boolean }): VelaWindow {
     settings,
     blocker,
     favicons,
+    history,
     onClosed: (closed) => windows.delete(closed.id),
     onUnexpectedRequest,
   });
@@ -141,6 +144,7 @@ if (!app.requestSingleInstanceLock()) {
       },
     });
 
+    history = new HistoryStore();
     favicons = new FaviconCache(app.getPath('userData'), true);
     await favicons.load();
     blocker = await loadBlocker(RESOURCES_DIR);
@@ -184,6 +188,17 @@ if (!app.requestSingleInstanceLock()) {
         };
       },
       cachedFavicon: (url) => favicons?.get(url) ?? null,
+      downloads: {
+        list: (sender) => windowFor(sender)?.downloads.list ?? [],
+        open: (sender, id) => windowFor(sender)?.downloads.open(id),
+        showInFolder: (sender, id) => windowFor(sender)?.downloads.showInFolder(id),
+        cancel: (sender, id) => windowFor(sender)?.downloads.cancel(id),
+        clear: (sender) => windowFor(sender)?.downloads.clear(),
+      },
+      history: {
+        search: (query, limit) => history?.search(query, limit) ?? [],
+        clear: () => history?.clear(),
+      },
       updater: {
         get current(): UpdateState {
           return updater?.current ?? { status: 'idle', version: null, message: null };

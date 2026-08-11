@@ -80,6 +80,26 @@ const tabIdString = z.string().min(1).max(64);
 /** Long enough for any real URL, short enough to bound what crosses the boundary. */
 const addressString = z.string().max(4096);
 
+export const downloadItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  filename: z.string().max(500),
+  url: z.string().max(4096),
+  state: z.enum(['progressing', 'paused', 'completed', 'cancelled', 'interrupted']),
+  receivedBytes: z.number().int().nonnegative(),
+  totalBytes: z.number().int().nonnegative(),
+  savePath: z.string().max(4096),
+  startedAt: z.number().int().nonnegative(),
+});
+export type DownloadItem = z.infer<typeof downloadItemSchema>;
+
+export const historyEntrySchema = z.object({
+  url: z.string().max(4096),
+  title: z.string().max(500),
+  visitedAt: z.number().int().nonnegative(),
+  visits: z.number().int().positive(),
+});
+export type HistoryEntry = z.infer<typeof historyEntrySchema>;
+
 export const workspaceSummarySchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(60),
@@ -99,6 +119,8 @@ export const tabSnapshotSchema = z.object({
   internal: internalPageSchema.nullable(),
   /** A suspended tab has given its renderer process back. */
   suspended: z.boolean(),
+  /** 100 unless the user has zoomed this host. */
+  zoomPercent: z.number().int().positive(),
   workspaceId: z.string().min(1).max(64),
   /** Set when an https upgrade failed and Vela is warning before plain http. */
   interstitialUrl: z.string().nullable(),
@@ -154,6 +176,9 @@ export const INVOKE_CHANNELS = {
   settingsExport: 'settings:export',
   settingsImport: 'settings:import',
   updatesGetState: 'updates:get-state',
+  downloadsGet: 'downloads:get',
+  historySearch: 'history:search',
+  historyClear: 'history:clear',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -186,6 +211,14 @@ export const SEND_CHANNELS = {
   workspacesDelete: 'workspaces:delete',
   workspacesActivate: 'workspaces:activate',
   tabsSetWorkspace: 'tabs:set-workspace',
+  downloadsOpen: 'downloads:open',
+  downloadsShow: 'downloads:show',
+  downloadsCancel: 'downloads:cancel',
+  downloadsClear: 'downloads:clear',
+  bookmarksAdd: 'bookmarks:add',
+  bookmarksRemove: 'bookmarks:remove',
+  bookmarksMove: 'bookmarks:move',
+  zoomSet: 'zoom:set',
   updatesCheck: 'updates:check',
   updatesDownload: 'updates:download',
   updatesInstall: 'updates:install',
@@ -203,6 +236,7 @@ export const EVENT_CHANNELS = {
   browserStateChanged: 'browser:state-changed',
   settingsChanged: 'settings:changed',
   updateStateChanged: 'updates:state-changed',
+  downloadsChanged: 'downloads:changed',
 } as const;
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNELS];
@@ -223,6 +257,12 @@ export const invokeContract = {
     request: z.object({ json: z.string().max(2_000_000) }),
     response: settingsImportResultSchema,
   },
+  [INVOKE_CHANNELS.downloadsGet]: { request: emptySchema, response: z.array(downloadItemSchema) },
+  [INVOKE_CHANNELS.historySearch]: {
+    request: z.object({ query: z.string().max(200), limit: z.number().int().min(1).max(200) }),
+    response: z.array(historyEntrySchema),
+  },
+  [INVOKE_CHANNELS.historyClear]: { request: emptySchema, response: z.boolean() },
   [INVOKE_CHANNELS.updatesGetState]: { request: emptySchema, response: updateStateSchema },
   [INVOKE_CHANNELS.privacyGetReport]: { request: emptySchema, response: privacyReportSchema },
   [INVOKE_CHANNELS.privacyClearData]: { request: emptySchema, response: z.boolean() },
@@ -255,6 +295,14 @@ export const sendContract = {
   [SEND_CHANNELS.workspacesDelete]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.workspacesActivate]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.tabsSetWorkspace]: z.object({ id: tabIdString, workspaceId: tabIdString }),
+  [SEND_CHANNELS.downloadsOpen]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.downloadsShow]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.downloadsCancel]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.downloadsClear]: emptySchema,
+  [SEND_CHANNELS.bookmarksAdd]: z.object({ url: addressString, title: z.string().max(200) }),
+  [SEND_CHANNELS.bookmarksRemove]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.bookmarksMove]: z.object({ id: tabIdString, toIndex: z.number().int().min(0) }),
+  [SEND_CHANNELS.zoomSet]: z.object({ id: tabIdString, direction: z.enum(['in', 'out', 'reset']) }),
   [SEND_CHANNELS.updatesCheck]: emptySchema,
   [SEND_CHANNELS.updatesDownload]: emptySchema,
   [SEND_CHANNELS.updatesInstall]: emptySchema,
@@ -271,6 +319,7 @@ export const eventContract = {
   [EVENT_CHANNELS.browserStateChanged]: browserStateSchema,
   [EVENT_CHANNELS.settingsChanged]: settingsSchema,
   [EVENT_CHANNELS.updateStateChanged]: updateStateSchema,
+  [EVENT_CHANNELS.downloadsChanged]: z.array(downloadItemSchema),
 } as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.infer<(typeof invokeContract)[C]['request']>;
@@ -353,6 +402,26 @@ export interface VelaBridge {
     activate(id: string): void;
     /** Moves a tab into another workspace, suspending it on the way out. */
     moveTab(id: string, workspaceId: string): void;
+  };
+  readonly downloads: {
+    list(): Promise<DownloadItem[]>;
+    open(id: string): void;
+    showInFolder(id: string): void;
+    cancel(id: string): void;
+    clear(): void;
+    onChanged(listener: (items: DownloadItem[]) => void): () => void;
+  };
+  readonly history: {
+    search(query: string, limit?: number): Promise<HistoryEntry[]>;
+    clear(): Promise<boolean>;
+  };
+  readonly bookmarks: {
+    add(url: string, title: string): void;
+    remove(id: string): void;
+    move(id: string, toIndex: number): void;
+  };
+  readonly zoom: {
+    set(id: string, direction: 'in' | 'out' | 'reset'): void;
   };
   readonly updates: {
     getState(): Promise<UpdateState>;

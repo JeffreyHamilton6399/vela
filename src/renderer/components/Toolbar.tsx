@@ -7,12 +7,21 @@ import { ArrowLeftIcon, ArrowRightIcon, CloseIcon, ReloadIcon } from './icons.js
 interface ToolbarProps {
   tab: TabSnapshot | null;
   searchEngineId: string;
+  bookmarked: boolean;
+  onToggleBookmark: () => void;
   addressRef: RefObject<AddressBarHandle | null>;
   trailing?: JSX.Element;
 }
 
 /** 48px of navigation controls above the page. */
-export function Toolbar({ tab, searchEngineId, addressRef, trailing }: ToolbarProps): JSX.Element {
+export function Toolbar({
+  tab,
+  searchEngineId,
+  bookmarked,
+  onToggleBookmark,
+  addressRef,
+  trailing,
+}: ToolbarProps): JSX.Element {
   const id = tab?.id ?? null;
 
   return (
@@ -61,6 +70,8 @@ export function Toolbar({ tab, searchEngineId, addressRef, trailing }: ToolbarPr
       <AddressBar
         tab={tab}
         searchEngineId={searchEngineId}
+        bookmarked={bookmarked}
+        onToggleBookmark={onToggleBookmark}
         handleRef={addressRef}
         onNavigate={(input) => {
           if (id !== null) window.vela.tabs.navigate(id, input);

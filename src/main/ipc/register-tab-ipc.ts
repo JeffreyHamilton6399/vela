@@ -162,6 +162,12 @@ export function registerTabIpc(deps: TabIpcDeps): void {
     });
   });
 
+  handleSend(deps, SEND_CHANNELS.zoomSet, ({ id, direction }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.setZoom(id, direction);
+    });
+  });
+
   handleSend(deps, SEND_CHANNELS.layoutSetInsets, (insets, sender) => {
     withManager(deps, sender, (manager) => {
       manager.setInsets(insets);

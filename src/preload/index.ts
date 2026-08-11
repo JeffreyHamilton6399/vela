@@ -17,11 +17,15 @@ import {
   privacyReportSchema,
   settingsImportResultSchema,
   updateStateSchema,
+  downloadItemSchema,
+  historyEntrySchema,
   windowStateSchema,
   type PrivacyReport,
   type SettingsImportResult,
   type SpeedDialAddPayload,
   type UpdateState,
+  type DownloadItem,
+  type HistoryEntry,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -181,6 +185,61 @@ const bridge: VelaBridge = {
     },
     moveTab(id: string, workspaceId: string): void {
       ipcRenderer.send(SEND_CHANNELS.tabsSetWorkspace, { id, workspaceId });
+    },
+  },
+  downloads: {
+    async list(): Promise<DownloadItem[]> {
+      return z
+        .array(downloadItemSchema)
+        .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.downloadsGet));
+    },
+    open(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsOpen, { id });
+    },
+    showInFolder(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsShow, { id });
+    },
+    cancel(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsCancel, { id });
+    },
+    clear(): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsClear);
+    },
+    onChanged(listener: (items: DownloadItem[]) => void): () => void {
+      const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
+        const parsed = z.array(downloadItemSchema).safeParse(payload);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(EVENT_CHANNELS.downloadsChanged, wrapped);
+      return () => {
+        ipcRenderer.off(EVENT_CHANNELS.downloadsChanged, wrapped);
+      };
+    },
+  },
+  history: {
+    async search(query: string, limit = 20): Promise<HistoryEntry[]> {
+      return z
+        .array(historyEntrySchema)
+        .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.historySearch, { query, limit }));
+    },
+    async clear(): Promise<boolean> {
+      return z.boolean().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.historyClear));
+    },
+  },
+  bookmarks: {
+    add(url: string, title: string): void {
+      ipcRenderer.send(SEND_CHANNELS.bookmarksAdd, { url, title });
+    },
+    remove(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.bookmarksRemove, { id });
+    },
+    move(id: string, toIndex: number): void {
+      ipcRenderer.send(SEND_CHANNELS.bookmarksMove, { id, toIndex });
+    },
+  },
+  zoom: {
+    set(id: string, direction: 'in' | 'out' | 'reset'): void {
+      ipcRenderer.send(SEND_CHANNELS.zoomSet, { id, direction });
     },
   },
   updates: {
