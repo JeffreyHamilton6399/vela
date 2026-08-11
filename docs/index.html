@@ -125,6 +125,14 @@
         margin-top: 48px;
       }
 
+      section p {
+        color: var(--ink-muted);
+      }
+
+      section p strong {
+        color: var(--ink);
+      }
+
       h2 {
         font-size: 20px;
         letter-spacing: -0.01em;
@@ -153,6 +161,14 @@
         padding: 16px 20px;
         color: var(--ink-muted);
         font-size: 14px;
+      }
+
+      kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 1px 4px;
       }
 
       code {
@@ -197,36 +213,83 @@
         <ul>
           <li>
             <strong>Two kinds of request out of the box.</strong> The pages you navigate to, and one
-            check for a new release. A third appears only if you switch on the assistant with your
-            own key.
+            check for a new release. Nothing else — and in development Vela logs anything that
+            tries, so accidental telemetry gets caught while it is being written.
           </li>
           <li>
             <strong>Ads and trackers blocked by default</strong>, using EasyList and EasyPrivacy
-            compiled into the app. Vela never fetches a filter list at runtime.
+            compiled into the app. Vela never fetches a filter list at runtime, because that would
+            be a third kind of request.
           </li>
           <li>
             <strong>No account, no server, no sync.</strong> Everything Vela remembers is one JSON
-            file on your machine, and the settings panel shows you where it is.
+            file on your machine, and the settings panel shows you where it is and hands you its
+            contents.
           </li>
           <li>
             <strong>Private windows are genuinely private.</strong> Their session exists only in
-            memory, and a test in the repository proves nothing is written to disk.
+            memory, and a test in the repository browses in one and proves nothing reaches the disk.
           </li>
           <li>
             <strong>One user agent for everyone.</strong> No per-install randomisation — that is a
             fingerprint, not a defence.
           </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>An assistant that runs on your machine</h2>
+        <p>
+          The sidebar assistant talks to <strong>Ollama on your own computer</strong> by default. No
+          key, no account, and nothing typed into it leaves the machine. Install Ollama, pull a
+          model, and the panel works.
+        </p>
+        <p>
+          You can point it at a hosted service instead, with your own API key. Vela ships without
+          one on purpose: this is a downloadable app, so a key built into it would sit in the bundle
+          for anyone to read, billed to whoever put it there.
+        </p>
+      </section>
+
+      <section>
+        <h2>The Opera parts</h2>
+        <ul>
           <li>
-            <strong>A sidebar assistant that uses your own API key.</strong> Vela ships without one,
-            because a key built into a downloadable app can be read by anyone who unzips it. Until
-            you add one, the panel makes no requests at all.
+            <strong>A left rail</strong> holding workspaces, sidebar tools and your docked sites.
           </li>
           <li>
-            <strong>No “free VPN”.</strong> A browser-branded free VPN is somebody else’s server
-            watching all your traffic. Vela has no servers, so instead you point it at a proxy or
-            VPN you already trust.
+            <strong>Workspaces</strong> — named tab groups. Leaving one suspends its tabs, so an
+            idle workspace costs storage for its titles and nothing else.
+          </li>
+          <li>
+            <strong>Web panels.</strong> Dock any site into the sidebar beside the page. Each one is
+            an ordinary page on the same hardened session a tab uses.
+          </li>
+          <li>
+            <strong>Speed Dial, bookmarks, history, downloads and per-site zoom</strong>, plus a
+            command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd> and notes, a calculator and a unit
+            converter in the sidebar.
+          </li>
+          <li>
+            <strong>Bang shortcuts</strong> — <code>!gh</code>, <code>!yt</code>, <code>!w</code> —
+            resolved on your machine, so they reach the site without a search engine seeing the
+            query first.
           </li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Two things it deliberately will not do</h2>
+        <p class="note">
+          <strong>No built-in VPN.</strong> A browser-branded “free VPN” is somebody else’s server
+          watching all your traffic — the exact arrangement this browser exists to avoid, and it
+          needs infrastructure Vela does not run. Settings takes a proxy or VPN you already trust
+          instead, and routes every session through it. <br /><br />
+          <strong>No sign-in, no sync.</strong> An account that carries your data between installs
+          needs a server holding that data. An account is the one thing that turns “a browser on
+          your machine” into “a profile someone else keeps”. Export the settings file and move it
+          yourself.
+        </p>
       </section>
 
       <section>
