@@ -46,7 +46,10 @@ test('opening the panel loads the site beside the page', async () => {
   // Driven through the rail, because opening a panel is renderer state as
   // well as a main-process view. The button appears once the settings change
   // has made its way back to the renderer.
-  const railButton = chrome.getByRole('button', { name: saved?.title ?? '' });
+  // Scoped to the rail: the sidebar list names the same panel.
+  const railButton = chrome
+    .getByRole('navigation', { name: 'Workspaces and tools' })
+    .getByRole('button', { name: saved?.title ?? '' });
   await expect(railButton).toBeVisible({ timeout: 15_000 });
   await railButton.click();
 

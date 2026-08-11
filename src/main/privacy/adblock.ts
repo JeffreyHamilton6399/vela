@@ -38,6 +38,16 @@ export async function loadBlocker(resourcesDir: string): Promise<BlockerHandle |
   }
 
   const listeners = new Set<(webContentsId: number) => void>();
+  /**
+   * Which sessions are already blocking.
+   *
+   * This is load-bearing, not bookkeeping. `enableBlockingInSession` returns
+   * early for a session it has already set up — but the cosmetic-filter IPC
+   * handlers below are cleared on the way in, so calling it again on an
+   * enabled session would remove those handlers and never put them back,
+   * leaving element hiding broken until restart.
+   */
+  const enabledSessions = new Set<Session>();
 
   blocker.on('request-blocked', (request: { tabId: number }) => {
     for (const listener of listeners) listener(request.tabId);
@@ -45,6 +55,8 @@ export async function loadBlocker(resourcesDir: string): Promise<BlockerHandle |
 
   return {
     enableFor: (session) => {
+      if (enabledSessions.has(session)) return;
+
       // Blocking is per session, but the adblocker's cosmetic-filter IPC
       // handlers are registered on the global `ipcMain` and throw if they
       // already exist. They close over the blocker rather than the session, so
@@ -52,9 +64,12 @@ export async function loadBlocker(resourcesDir: string): Promise<BlockerHandle |
       // blocking without breaking the first.
       for (const channel of COSMETIC_CHANNELS) ipcMain.removeHandler(channel);
       blocker.enableBlockingInSession(session);
+      enabledSessions.add(session);
     },
     disableFor: (session) => {
+      if (!enabledSessions.has(session)) return;
       blocker.disableBlockingInSession(session);
+      enabledSessions.delete(session);
     },
     onBlocked: (listener) => {
       listeners.add(listener);
