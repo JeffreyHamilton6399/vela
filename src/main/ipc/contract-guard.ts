@@ -55,7 +55,10 @@ function reject(options: GuardOptions, channel: string, detail: string): IpcCont
 export function handleInvoke<C extends InvokeChannel>(
   options: GuardOptions,
   channel: C,
-  handler: (payload: InvokeRequest<C>) => Promise<InvokeResponse<C>> | InvokeResponse<C>,
+  handler: (
+    payload: InvokeRequest<C>,
+    sender: unknown,
+  ) => Promise<InvokeResponse<C>> | InvokeResponse<C>,
 ): void {
   // `channel` is a literal from our own const map, never renderer input.
   // The lookup widens to a union of every channel's schemas, so it is narrowed
@@ -83,7 +86,7 @@ export function handleInvoke<C extends InvokeChannel>(
       throw reject(options, channel, `invalid request: ${parsed.error.issues[0]?.message ?? ''}`);
     }
 
-    const result = await handler(parsed.data);
+    const result = await handler(parsed.data, event.sender);
 
     const validated = contract.response.safeParse(result);
     if (!validated.success) {
@@ -101,7 +104,7 @@ export function handleInvoke<C extends InvokeChannel>(
 export function handleSend<C extends SendChannel>(
   options: GuardOptions,
   channel: C,
-  handler: (payload: SendPayload<C>) => void,
+  handler: (payload: SendPayload<C>, sender: unknown) => void,
 ): void {
   // Same narrowing as handleInvoke: the map lookup widens across channels.
   // eslint-disable-next-line security/detect-object-injection
@@ -123,6 +126,6 @@ export function handleSend<C extends SendChannel>(
       return;
     }
 
-    handler(parsed.data);
+    handler(parsed.data, event.sender);
   });
 }

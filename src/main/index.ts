@@ -1,28 +1,37 @@
 import path from 'node:path';
-import { BrowserWindow, app, ipcMain, nativeTheme, session, shell } from 'electron';
-import { EVENT_CHANNELS, type AppInfo, type BrowserState } from '../shared/types/ipc.js';
+import { BrowserWindow, app, ipcMain, nativeTheme, session } from 'electron';
+import type { AppInfo } from '../shared/types/ipc.js';
 import { resolvePlatform } from '../shared/platform.js';
-import { DEFAULT_SEARCH_ENGINE_ID } from '../shared/search-engines.js';
-import { createWindowOptions, SURFACE } from './window-options.js';
-import { registerWindowIpc, readWindowState } from './ipc/register-window-ipc.js';
+import { registerWindowIpc } from './ipc/register-window-ipc.js';
 import { registerTabIpc } from './ipc/register-tab-ipc.js';
-import { popupTabMenu } from './menus/tab-menu.js';
-import { TabManager } from './tabs/tab-manager.js';
+import { registerSettingsIpc } from './ipc/register-settings-ipc.js';
 import type { IpcContractError } from './ipc/contract-guard.js';
+import { popupTabMenu } from './menus/tab-menu.js';
+import { loadBlocker, type BlockerHandle } from './privacy/adblock.js';
+import { buildUserAgent, UPDATE_FEED_URL } from './privacy/policies.js';
+import { clearBrowsingData } from './privacy/session-hardening.js';
+import { SettingsStore } from './settings/store.js';
+import { SURFACE } from './window-options.js';
+import { VelaWindow } from './vela-window.js';
 
 const PLATFORM = resolvePlatform(process.platform);
 const IS_DEV = !app.isPackaged;
 
 /** Build output root. Resolves identically in dev and inside the packaged asar. */
-const OUT_DIR = path.join(app.getAppPath(), 'out');
+const APP_PATH = app.getAppPath();
+const OUT_DIR = path.join(APP_PATH, 'out');
 const PRELOAD_PATH = path.join(OUT_DIR, 'preload', 'index.cjs');
 const RENDERER_HTML = path.join(OUT_DIR, 'renderer', 'index.html');
+const RESOURCES_DIR = path.join(APP_PATH, 'resources');
 const DEV_SERVER_URL = process.env['VELA_DEV_SERVER_URL'];
+
+const USER_AGENT = buildUserAgent(PLATFORM, process.versions.chrome.split('.')[0] ?? '140');
 
 app.setName('Vela');
 
-let mainWindow: BrowserWindow | null = null;
-let tabManager: TabManager | null = null;
+const windows = new Map<number, VelaWindow>();
+let settings: SettingsStore | null = null;
+let blocker: BlockerHandle | null = null;
 
 function getAppInfo(): AppInfo {
   return {
@@ -36,154 +45,136 @@ function getAppInfo(): AppInfo {
 }
 
 function backgroundColor(): string {
-  return nativeTheme.shouldUseDarkColors ? SURFACE.dark : SURFACE.light;
+  const preference = settings?.current.theme ?? 'system';
+  const dark = preference === 'system' ? nativeTheme.shouldUseDarkColors : preference === 'dark';
+  return dark ? SURFACE.dark : SURFACE.light;
 }
 
-/**
- * The chrome renderer draws UI only — it never navigates and never opens
- * windows. Web content lives in `WebContentsView`s owned by the TabManager.
- */
-function lockDownChrome(window: BrowserWindow): void {
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) {
-      void shell.openExternal(url);
-    }
-    return { action: 'deny' };
-  });
-
-  window.webContents.on('will-navigate', (event, url) => {
-    const current = window.webContents.getURL();
-    if (url !== current) {
-      event.preventDefault();
-    }
-  });
-
-  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => {
-    callback(false);
-  });
-}
-
-/** Pushes window state to the renderer so the titlebar can redraw. */
-function broadcastWindowState(window: BrowserWindow): void {
-  if (window.isDestroyed() || window.webContents.isDestroyed()) return;
-  window.webContents.send(EVENT_CHANNELS.windowStateChanged, readWindowState(window));
-}
-
-function watchWindowState(window: BrowserWindow): void {
-  const push = (): void => {
-    broadcastWindowState(window);
-  };
-
-  window.on('maximize', push);
-  window.on('unmaximize', push);
-  window.on('minimize', push);
-  window.on('restore', push);
-  window.on('enter-full-screen', push);
-  window.on('leave-full-screen', push);
-  window.on('focus', push);
-  window.on('blur', push);
-}
-
-/** Pushes tab state to the renderer so the strip and toolbar can redraw. */
-function broadcastBrowserState(window: BrowserWindow, state: BrowserState): void {
-  if (window.isDestroyed() || window.webContents.isDestroyed()) return;
-  window.webContents.send(EVENT_CHANNELS.browserStateChanged, state);
-}
-
-function createMainWindow(): BrowserWindow {
-  const window = new BrowserWindow(
-    createWindowOptions({
-      platform: PLATFORM,
-      preloadPath: PRELOAD_PATH,
-      backgroundColor: backgroundColor(),
-    }),
-  );
-
-  lockDownChrome(window);
-  watchWindowState(window);
-
-  tabManager = new TabManager({
-    window,
-    session: session.defaultSession,
-    onStateChanged: (state) => {
-      broadcastBrowserState(window, state);
-    },
-    getSearchEngineId: () => DEFAULT_SEARCH_ENGINE_ID,
-  });
-
-  window.once('ready-to-show', () => {
-    window.show();
-  });
-
-  window.on('closed', () => {
-    tabManager?.dispose();
-    tabManager = null;
-    mainWindow = null;
-  });
-
-  if (DEV_SERVER_URL !== undefined && DEV_SERVER_URL !== '') {
-    void window.loadURL(DEV_SERVER_URL);
-    window.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    void window.loadFile(RENDERER_HTML);
+/** Resolves which window an IPC message came from. */
+function windowFor(sender: unknown): VelaWindow | null {
+  for (const window of windows.values()) {
+    if (window.owns(sender)) return window;
   }
+  return null;
+}
 
-  // Open the first tab once the chrome is ready to render it.
-  window.webContents.once('did-finish-load', () => {
-    tabManager?.create();
+function onUnexpectedRequest(url: string): void {
+  // Vela makes exactly two kinds of request: pages the user navigated to and
+  // the update check. Anything else is a bug, caught here in development
+  // rather than after shipping.
+  console.error(`[privacy] unexpected request from Vela itself: ${url}`);
+}
+
+function createWindow(options: { isPrivate: boolean }): VelaWindow {
+  if (settings === null) throw new Error('settings store is not ready');
+
+  const window = new VelaWindow({
+    platform: PLATFORM,
+    preloadPath: PRELOAD_PATH,
+    rendererHtml: RENDERER_HTML,
+    devServerUrl: DEV_SERVER_URL,
+    backgroundColor: backgroundColor(),
+    userAgent: USER_AGENT,
+    isDev: IS_DEV,
+    isPrivate: options.isPrivate,
+    settings,
+    blocker,
+    onClosed: (closed) => windows.delete(closed.id),
+    onUnexpectedRequest,
   });
 
+  windows.set(window.id, window);
   return window;
 }
 
 function onIpcViolation(error: IpcContractError): void {
-  // A violation means the renderer sent something the contract forbids.
-  // In development that is a bug worth failing loudly on.
   console.error(error.message);
+}
+
+/** Honours the clear-on-exit toggle before the app goes away. */
+async function clearOnExitIfRequested(): Promise<void> {
+  if (settings?.current.clearOnExit !== true) return;
+  await clearBrowsingData(session.defaultSession);
 }
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow === null) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+    const [first] = windows.values();
+    if (first === undefined) return;
+    if (first.window.isMinimized()) first.window.restore();
+    first.window.focus();
   });
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    settings = new SettingsStore();
+    blocker = await loadBlocker(RESOURCES_DIR);
+
     const guard = {
       ipcMain,
-      isTrustedSender: (event: { readonly sender: unknown }) =>
-        mainWindow !== null && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents,
+      isTrustedSender: (event: { readonly sender: unknown }) => windowFor(event.sender) !== null,
       onViolation: onIpcViolation,
     };
 
-    registerWindowIpc({ ...guard, getWindow: () => mainWindow, getAppInfo });
+    registerWindowIpc({
+      ...guard,
+      getWindow: (sender) => windowFor(sender)?.window ?? null,
+      getAppInfo,
+      openPrivateWindow: () => {
+        createWindow({ isPrivate: true });
+      },
+    });
+
     registerTabIpc({
       ...guard,
-      getManager: () => tabManager,
-      popupTabMenu: (manager, id) => {
-        if (mainWindow !== null) popupTabMenu(mainWindow, manager, id);
+      getManager: (sender) => windowFor(sender)?.manager ?? null,
+      popupTabMenu: (manager, id, sender) => {
+        const owner = windowFor(sender);
+        if (owner !== null) popupTabMenu(owner.window, manager, id);
+      },
+    });
+
+    registerSettingsIpc({
+      ...guard,
+      getStore: () => settings,
+      getReport: (sender) => {
+        const owner = windowFor(sender);
+        return {
+          adblockEnabled: blocker !== null && (settings?.current.blockAdsAndTrackers ?? false),
+          settingsPath: settings?.path ?? '',
+          blockedThisWindow: owner?.blockedCount ?? 0,
+          privateSession: owner?.isPrivate ?? false,
+          updateFeedUrl: UPDATE_FEED_URL,
+          userAgent: USER_AGENT,
+        };
+      },
+      clearData: async (sender) => {
+        const owner = windowFor(sender);
+        if (owner === null) return false;
+        await clearBrowsingData(owner.session);
+        return true;
       },
     });
 
     nativeTheme.on('updated', () => {
-      mainWindow?.setBackgroundColor(backgroundColor());
+      for (const window of windows.values()) {
+        window.window.setBackgroundColor(backgroundColor());
+      }
     });
 
-    mainWindow = createMainWindow();
+    createWindow({ isPrivate: false });
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        mainWindow = createMainWindow();
-      }
+      if (BrowserWindow.getAllWindows().length === 0) createWindow({ isPrivate: false });
     });
   });
 
   app.on('window-all-closed', () => {
     if (PLATFORM !== 'darwin') {
-      app.quit();
+      void clearOnExitIfRequested().finally(() => {
+        app.quit();
+      });
     }
   });
 }

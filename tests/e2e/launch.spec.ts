@@ -40,7 +40,15 @@ test('the preload bridge is the only surface exposed', async () => {
   const page = await app.firstWindow();
 
   const keys = await page.evaluate(() => Object.keys(Reflect.get(globalThis, 'vela') as object));
-  expect(keys.sort()).toEqual(['app', 'layout', 'platform', 'tabs', 'window']);
+  expect(keys.sort()).toEqual([
+    'app',
+    'layout',
+    'platform',
+    'privacy',
+    'settings',
+    'tabs',
+    'window',
+  ]);
 });
 
 test('a typed IPC round trip works', async () => {

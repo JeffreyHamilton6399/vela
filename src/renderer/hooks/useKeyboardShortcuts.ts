@@ -27,10 +27,17 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
       const mod = primaryModifier(event);
       const key = event.key.toLowerCase();
 
-      if (mod && event.shiftKey && key === 't') {
-        event.preventDefault();
-        window.vela.tabs.restoreClosed();
-        return;
+      if (mod && event.shiftKey) {
+        if (key === 't') {
+          event.preventDefault();
+          window.vela.tabs.restoreClosed();
+          return;
+        }
+        if (key === 'n') {
+          event.preventDefault();
+          window.vela.window.openPrivate();
+          return;
+        }
       }
 
       if (mod && !event.shiftKey) {

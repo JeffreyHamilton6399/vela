@@ -1,12 +1,18 @@
 import { WebContentsView, type Session } from 'electron';
 import type { TabSnapshot } from '../../shared/types/ipc.js';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
+import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
 
 export interface TabEvents {
   /** Any change worth redrawing the tab strip for. */
   onChanged: (tab: Tab) => void;
   /** A link that asked for a new tab (target=_blank, window.open). */
   onOpenInNewTab: (url: string, opener: Tab) => void;
+  /**
+   * Vets a navigation before it happens. Returning a different URL upgrades
+   * it; returning null shows the plain-http interstitial instead.
+   */
+  vetNavigation: (url: string) => { url: string } | { interstitial: string } | null;
 }
 
 export interface TabInit {
@@ -40,6 +46,8 @@ export class Tab {
   /** True once a real page has been loaded, so Back/Forward can cross the
    *  boundary between the new tab page and web content. */
   private hasLoadedPage = false;
+  /** The plain-http address being warned about, if any. */
+  private interstitialUrl: string | null = null;
   private title = 'New Tab';
   private faviconUrl: string | null = null;
   private loading = false;
@@ -77,12 +85,18 @@ export class Tab {
     return this.view.webContents.isDestroyed();
   }
 
+  /** True while Vela's own UI, rather than a page, owns the content region. */
+  get chromeOwnsContent(): boolean {
+    return this.internal !== null || this.interstitialUrl !== null;
+  }
+
   snapshot(): TabSnapshot {
     const internal = this.internal !== null;
     return {
       id: this.id,
       url: internal ? '' : this.currentUrl,
       title: internal ? 'New Tab' : this.title,
+      interstitialUrl: this.interstitialUrl,
       faviconUrl: internal ? null : this.faviconUrl,
       loading: !internal && this.loading,
       // From a page you can always get back to the new tab page you started
@@ -97,13 +111,42 @@ export class Tab {
     };
   }
 
+  /**
+   * Loads a URL after the navigation policy has vetted it: https upgrades
+   * happen here, and a host the user has accepted plain http for gets the
+   * interstitial rather than a silent downgrade.
+   */
   loadUrl(url: string): void {
     if (this.destroyed) return;
+
+    const verdict = this.events.vetNavigation(url);
+    if (verdict !== null && 'interstitial' in verdict) {
+      this.internal = null;
+      this.interstitialUrl = verdict.interstitial;
+      this.currentUrl = verdict.interstitial;
+      this.changed();
+      return;
+    }
+
+    const target = verdict === null ? url : verdict.url;
     this.internal = null;
+    this.interstitialUrl = null;
+    this.hasLoadedPage = true;
+    this.currentUrl = target;
+    void this.webContents.loadURL(target).catch(() => {
+      // did-fail-load reports this to the UI; a rejected promise here is noise.
+    });
+  }
+
+  /** Loads an address exactly as given, skipping the https upgrade. */
+  loadUrlUnchecked(url: string): void {
+    if (this.destroyed) return;
+    this.internal = null;
+    this.interstitialUrl = null;
     this.hasLoadedPage = true;
     this.currentUrl = url;
     void this.webContents.loadURL(url).catch(() => {
-      // did-fail-load reports this to the UI; a rejected promise here is noise.
+      /* reported by did-fail-load */
     });
   }
 
@@ -113,8 +156,14 @@ export class Tab {
    */
   showNewTabPage(): void {
     this.internal = 'newtab';
+    this.interstitialUrl = null;
     this.loading = false;
     this.changed();
+  }
+
+  /** The address the interstitial is warning about, if it is showing. */
+  get pendingInsecureUrl(): string | null {
+    return this.interstitialUrl;
   }
 
   /** The inverse of `showNewTabPage`: reveals the page that is still loaded. */
@@ -172,9 +221,26 @@ export class Tab {
   private wireEvents(): void {
     const contents = this.webContents;
 
+    applyWebRtcPolicy(contents);
+
     contents.setWindowOpenHandler(({ url }) => {
       this.events.onOpenInNewTab(url, this);
       return { action: 'deny' };
+    });
+
+    // Link clicks inside the page go through the same https policy as
+    // anything typed into the address bar.
+    contents.on('will-navigate', (event, url) => {
+      const verdict = this.events.vetNavigation(url);
+      if (verdict === null) return;
+      event.preventDefault();
+      if ('interstitial' in verdict) {
+        this.interstitialUrl = verdict.interstitial;
+        this.currentUrl = verdict.interstitial;
+        this.changed();
+        return;
+      }
+      this.loadUrlUnchecked(verdict.url);
     });
 
     contents.on('page-title-updated', (_event, title) => {

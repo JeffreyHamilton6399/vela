@@ -31,3 +31,6 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Built at build time by scripts/fetch-filters.mjs
+resources/adblock-engine.bin

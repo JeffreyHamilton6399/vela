@@ -6,6 +6,36 @@
  * boundary. If a channel is not in this file it does not exist.
  */
 import { z } from 'zod';
+import {
+  settingsPatchSchema,
+  settingsSchema,
+  type Settings,
+  type SettingsPatch,
+} from '../settings.js';
+
+/**
+ * What Vela knows about itself, for the settings panel to show plainly.
+ * The honest answer to "what is collected" is "nothing", and these numbers
+ * are what make that checkable rather than merely claimed.
+ */
+export const privacyReportSchema = z.object({
+  adblockEnabled: z.boolean(),
+  /** Where the local settings file lives — the only thing Vela writes. */
+  settingsPath: z.string(),
+  /** Blocked requests across every tab in this window since it opened. */
+  blockedThisWindow: z.number().int().nonnegative(),
+  privateSession: z.boolean(),
+  /** The one address Vela contacts on its own behalf. */
+  updateFeedUrl: z.string(),
+  userAgent: z.string(),
+});
+export type PrivacyReport = z.infer<typeof privacyReportSchema>;
+
+export const settingsImportResultSchema = z.object({
+  ok: z.boolean(),
+  message: z.string(),
+});
+export type SettingsImportResult = z.infer<typeof settingsImportResultSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Payload schemas                                                     */
@@ -53,6 +83,8 @@ export const tabSnapshotSchema = z.object({
   canGoForward: z.boolean(),
   pinned: z.boolean(),
   internal: internalPageSchema.nullable(),
+  /** Set when an https upgrade failed and Vela is warning before plain http. */
+  interstitialUrl: z.string().nullable(),
   blockedCount: z.number().int().nonnegative(),
 });
 export type TabSnapshot = z.infer<typeof tabSnapshotSchema>;
@@ -60,6 +92,8 @@ export type TabSnapshot = z.infer<typeof tabSnapshotSchema>;
 export const browserStateSchema = z.object({
   tabs: z.array(tabSnapshotSchema),
   activeTabId: tabIdString.nullable(),
+  /** True in a private window, whose session is memory-only. */
+  privateSession: z.boolean(),
 });
 export type BrowserState = z.infer<typeof browserStateSchema>;
 
@@ -92,6 +126,11 @@ export const INVOKE_CHANNELS = {
   appGetInfo: 'app:get-info',
   windowGetState: 'window:get-state',
   browserGetState: 'browser:get-state',
+  settingsGet: 'settings:get',
+  settingsExport: 'settings:export',
+  settingsImport: 'settings:import',
+  privacyGetReport: 'privacy:get-report',
+  privacyClearData: 'privacy:clear-data',
 } as const;
 
 /** Renderer -> main, fire and forget. */
@@ -99,6 +138,9 @@ export const SEND_CHANNELS = {
   windowMinimize: 'window:minimize',
   windowToggleMaximize: 'window:toggle-maximize',
   windowClose: 'window:close',
+  windowOpenPrivate: 'window:open-private',
+  settingsSet: 'settings:set',
+  tabsContinueInsecure: 'tabs:continue-insecure',
   tabsCreate: 'tabs:create',
   tabsClose: 'tabs:close',
   tabsActivate: 'tabs:activate',
@@ -122,6 +164,7 @@ export const SEND_CHANNELS = {
 export const EVENT_CHANNELS = {
   windowStateChanged: 'window:state-changed',
   browserStateChanged: 'browser:state-changed',
+  settingsChanged: 'settings:changed',
 } as const;
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNELS];
@@ -136,12 +179,23 @@ export const invokeContract = {
   [INVOKE_CHANNELS.appGetInfo]: { request: emptySchema, response: appInfoSchema },
   [INVOKE_CHANNELS.windowGetState]: { request: emptySchema, response: windowStateSchema },
   [INVOKE_CHANNELS.browserGetState]: { request: emptySchema, response: browserStateSchema },
+  [INVOKE_CHANNELS.settingsGet]: { request: emptySchema, response: settingsSchema },
+  [INVOKE_CHANNELS.settingsExport]: { request: emptySchema, response: z.string() },
+  [INVOKE_CHANNELS.settingsImport]: {
+    request: z.object({ json: z.string().max(2_000_000) }),
+    response: settingsImportResultSchema,
+  },
+  [INVOKE_CHANNELS.privacyGetReport]: { request: emptySchema, response: privacyReportSchema },
+  [INVOKE_CHANNELS.privacyClearData]: { request: emptySchema, response: z.boolean() },
 } as const satisfies Record<InvokeChannel, { request: z.ZodType; response: z.ZodType }>;
 
 export const sendContract = {
   [SEND_CHANNELS.windowMinimize]: emptySchema,
   [SEND_CHANNELS.windowToggleMaximize]: emptySchema,
   [SEND_CHANNELS.windowClose]: emptySchema,
+  [SEND_CHANNELS.windowOpenPrivate]: emptySchema,
+  [SEND_CHANNELS.settingsSet]: settingsPatchSchema,
+  [SEND_CHANNELS.tabsContinueInsecure]: tabRefSchema,
   [SEND_CHANNELS.tabsCreate]: tabCreateSchema,
   [SEND_CHANNELS.tabsClose]: tabRefSchema,
   [SEND_CHANNELS.tabsActivate]: tabRefSchema,
@@ -164,6 +218,7 @@ export const sendContract = {
 export const eventContract = {
   [EVENT_CHANNELS.windowStateChanged]: windowStateSchema,
   [EVENT_CHANNELS.browserStateChanged]: browserStateSchema,
+  [EVENT_CHANNELS.settingsChanged]: settingsSchema,
 } as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.infer<(typeof invokeContract)[C]['request']>;
@@ -184,6 +239,8 @@ export const ALL_CHANNELS: readonly string[] = [
 /* The bridge surface exposed on window.vela                           */
 /* ------------------------------------------------------------------ */
 
+export type { Settings, SettingsPatch } from '../settings.js';
+
 export interface VelaBridge {
   /**
    * Available synchronously so the titlebar can draw the correct window
@@ -198,8 +255,22 @@ export interface VelaBridge {
     minimize(): void;
     toggleMaximize(): void;
     close(): void;
+    /** Opens a window on a memory-only session that is destroyed on close. */
+    openPrivate(): void;
     /** Returns an unsubscribe function. */
     onStateChanged(listener: (state: WindowState) => void): () => void;
+  };
+  readonly settings: {
+    get(): Promise<Settings>;
+    set(patch: SettingsPatch): void;
+    export(): Promise<string>;
+    import(json: string): Promise<SettingsImportResult>;
+    onChanged(listener: (settings: Settings) => void): () => void;
+  };
+  readonly privacy: {
+    getReport(): Promise<PrivacyReport>;
+    /** Wipes cookies, cache, and storage for this window's session. */
+    clearData(): Promise<boolean>;
   };
   readonly tabs: {
     getState(): Promise<BrowserState>;
@@ -219,6 +290,8 @@ export interface VelaBridge {
     duplicate(id: string): void;
     /** Opens the native tab context menu at the cursor. */
     openContextMenu(id: string): void;
+    /** Accepts the plain-http interstitial for this tab's host. */
+    continueInsecure(id: string): void;
     onStateChanged(listener: (state: BrowserState) => void): () => void;
   };
   readonly layout: {

@@ -1,7 +1,6 @@
 /**
- * Stage 1 channel registrations: app metadata and window controls.
- * Dependencies are injected so this whole module is unit-testable without
- * booting Electron.
+ * App metadata and window controls. Dependencies are injected so this whole
+ * module is unit-testable without booting Electron.
  */
 import {
   INVOKE_CHANNELS,
@@ -25,8 +24,10 @@ export interface WindowLike {
 }
 
 export interface WindowIpcDeps extends GuardOptions {
-  getWindow: () => WindowLike | null;
+  /** Resolves the window a message came from — there may be several. */
+  getWindow: (sender: unknown) => WindowLike | null;
   getAppInfo: () => AppInfo;
+  openPrivateWindow: () => void;
 }
 
 export function readWindowState(window: WindowLike | null): WindowState {
@@ -42,9 +43,9 @@ export function readWindowState(window: WindowLike | null): WindowState {
 }
 
 /** Runs the action only when a live window is present. */
-function withWindow(deps: WindowIpcDeps, action: (window: WindowLike) => void): () => void {
-  return () => {
-    const window = deps.getWindow();
+function withWindow(deps: WindowIpcDeps, action: (window: WindowLike) => void) {
+  return (_payload: undefined, sender: unknown): void => {
+    const window = deps.getWindow(sender);
     if (window !== null && !window.isDestroyed()) {
       action(window);
     }
@@ -53,7 +54,9 @@ function withWindow(deps: WindowIpcDeps, action: (window: WindowLike) => void): 
 
 export function registerWindowIpc(deps: WindowIpcDeps): void {
   handleInvoke(deps, INVOKE_CHANNELS.appGetInfo, () => deps.getAppInfo());
-  handleInvoke(deps, INVOKE_CHANNELS.windowGetState, () => readWindowState(deps.getWindow()));
+  handleInvoke(deps, INVOKE_CHANNELS.windowGetState, (_payload, sender) =>
+    readWindowState(deps.getWindow(sender)),
+  );
 
   handleSend(
     deps,
@@ -82,4 +85,8 @@ export function registerWindowIpc(deps: WindowIpcDeps): void {
       window.close();
     }),
   );
+
+  handleSend(deps, SEND_CHANNELS.windowOpenPrivate, () => {
+    deps.openPrivateWindow();
+  });
 }

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { BrowserWindow, Session } from 'electron';
 import type { BrowserState } from '../../shared/types/ipc.js';
 import { resolveAddressInput } from '../../shared/address-input.js';
+import { decideHttpsUpgrade } from '../privacy/policies.js';
 import {
   boundsEqual,
   computeViewBounds,
@@ -26,6 +27,10 @@ export interface TabManagerOptions {
   onStateChanged: (state: BrowserState) => void;
   /** Read lazily so a settings change applies without a restart. */
   getSearchEngineId: () => string;
+  getHttpsPolicy: () => { enabled: boolean; allowlist: readonly string[] };
+  /** Records the user's decision to accept plain http for a host. */
+  allowHttpHost: (host: string) => void;
+  isPrivate: boolean;
 }
 
 const MAX_CLOSED_HISTORY = 25;
@@ -59,7 +64,51 @@ export class TabManager {
     return {
       tabs: this.tabs.map((tab) => tab.snapshot()),
       activeTabId: this.activeId,
+      privateSession: this.options.isPrivate,
     };
+  }
+
+  /**
+   * Applies the https policy to a navigation. Returns null to let it proceed
+   * untouched, so the caller can tell "no change" from "upgraded".
+   */
+  private vetNavigation(url: string): { url: string } | { interstitial: string } | null {
+    const decision = decideHttpsUpgrade(url, this.options.getHttpsPolicy());
+    switch (decision.action) {
+      case 'upgrade':
+        return { url: decision.url };
+      case 'interstitial':
+        return { interstitial: decision.url };
+      default:
+        return null;
+    }
+  }
+
+  /** Attributes a blocked request to its tab. Returns false if it had none. */
+  countBlocked(webContentsId: number): boolean {
+    const tab = this.tabs.find(
+      (candidate) => !candidate.destroyed && candidate.webContents.id === webContentsId,
+    );
+    if (tab === undefined) return false;
+    tab.countBlocked(1);
+    this.notify();
+    return true;
+  }
+
+  /** Accepts the plain-http warning for this tab's host and loads the page. */
+  continueInsecure(id: string): void {
+    const tab = this.find(id);
+    if (tab === null) return;
+    const pending = tab.pendingInsecureUrl;
+    if (pending === null) return;
+
+    try {
+      this.options.allowHttpHost(new URL(pending).host);
+    } catch {
+      return;
+    }
+    tab.loadUrlUnchecked(pending);
+    this.notify();
   }
 
   get activeTab(): Tab | null {
@@ -106,6 +155,7 @@ export class TabManager {
         onOpenInNewTab: (url, opener) => {
           this.create({ url, active: true, openerId: opener.id });
         },
+        vetNavigation: (url) => this.vetNavigation(url),
       },
     });
 
@@ -228,7 +278,7 @@ export class TabManager {
    */
   private syncVisibility(): void {
     if (this.attached === null || this.disposed) return;
-    const showPage = this.attached.internal === null && !this.overlayOpen;
+    const showPage = !this.attached.chromeOwnsContent && !this.overlayOpen;
     this.attached.view.setVisible(showPage);
   }
 

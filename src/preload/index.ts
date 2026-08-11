@@ -5,14 +5,20 @@
  * Runs in a sandboxed context, so this file must stay free of Node APIs.
  * Everything it needs is bundled in.
  */
+import { z } from 'zod';
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { settingsSchema, type Settings, type SettingsPatch } from '../shared/settings.js';
 import {
   EVENT_CHANNELS,
   INVOKE_CHANNELS,
   SEND_CHANNELS,
   appInfoSchema,
   browserStateSchema,
+  privacyReportSchema,
+  settingsImportResultSchema,
   windowStateSchema,
+  type PrivacyReport,
+  type SettingsImportResult,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -41,6 +47,9 @@ const bridge: VelaBridge = {
     },
     close(): void {
       ipcRenderer.send(SEND_CHANNELS.windowClose);
+    },
+    openPrivate(): void {
+      ipcRenderer.send(SEND_CHANNELS.windowOpenPrivate);
     },
     onStateChanged(listener: (state: WindowState) => void): () => void {
       const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
@@ -104,6 +113,9 @@ const bridge: VelaBridge = {
     openContextMenu(id: string): void {
       ipcRenderer.send(SEND_CHANNELS.menuTab, { id });
     },
+    continueInsecure(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.tabsContinueInsecure, { id });
+    },
     onStateChanged(listener: (state: BrowserState) => void): () => void {
       const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
         const parsed = browserStateSchema.safeParse(payload);
@@ -115,6 +127,40 @@ const bridge: VelaBridge = {
       return () => {
         ipcRenderer.off(EVENT_CHANNELS.browserStateChanged, wrapped);
       };
+    },
+  },
+  settings: {
+    async get(): Promise<Settings> {
+      return settingsSchema.parse(await ipcRenderer.invoke(INVOKE_CHANNELS.settingsGet));
+    },
+    set(patch: SettingsPatch): void {
+      ipcRenderer.send(SEND_CHANNELS.settingsSet, patch);
+    },
+    async export(): Promise<string> {
+      return z.string().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.settingsExport));
+    },
+    async import(json: string): Promise<SettingsImportResult> {
+      return settingsImportResultSchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.settingsImport, { json }),
+      );
+    },
+    onChanged(listener: (settings: Settings) => void): () => void {
+      const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
+        const parsed = settingsSchema.safeParse(payload);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(EVENT_CHANNELS.settingsChanged, wrapped);
+      return () => {
+        ipcRenderer.off(EVENT_CHANNELS.settingsChanged, wrapped);
+      };
+    },
+  },
+  privacy: {
+    async getReport(): Promise<PrivacyReport> {
+      return privacyReportSchema.parse(await ipcRenderer.invoke(INVOKE_CHANNELS.privacyGetReport));
+    },
+    async clearData(): Promise<boolean> {
+      return z.boolean().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.privacyClearData));
     },
   },
   layout: {

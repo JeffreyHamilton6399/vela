@@ -1,23 +1,39 @@
-import { useCallback, useMemo, useRef, type JSX } from 'react';
-import { DEFAULT_SEARCH_ENGINE_ID } from '../shared/search-engines.js';
+import { useCallback, useMemo, useRef, useState, type JSX } from 'react';
 import type { AddressBarHandle } from './components/AddressBar.js';
+import { BlockedCount } from './components/BlockedCount.js';
+import { InsecureInterstitial } from './components/InsecureInterstitial.js';
 import { NewTabPage } from './components/NewTabPage.js';
+import { PrivacyPanel } from './components/PrivacyPanel.js';
 import { TitleBar } from './components/TitleBar.js';
 import { Toolbar } from './components/Toolbar.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
+import { useOverlay } from './hooks/useOverlay.js';
+import { useSettings, useThemePreference } from './hooks/useSettings.js';
 import { useWindowState } from './hooks/useWindowState.js';
+
+/** Whatever occupies the content region when a page is not showing. */
+function ContentRegion({ tab }: { tab: ReturnType<typeof useActiveTab> }): JSX.Element | null {
+  if (tab === null) return null;
+  if (tab.interstitialUrl !== null) return <InsecureInterstitial tab={tab} />;
+  if (tab.internal === 'newtab') return <NewTabPage />;
+  return null;
+}
 
 export function App(): JSX.Element {
   const browser = useBrowserState();
   const tab = useActiveTab(browser);
+  const settings = useSettings();
   const { maximized, focused } = useWindowState();
+  useThemePreference(settings.theme);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const addressRef = useRef<AddressBarHandle | null>(null);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   useContentInsets(contentRef);
+  useOverlay(privacyOpen);
 
   const focusAddressBar = useCallback(() => {
     addressRef.current?.focus();
@@ -33,12 +49,33 @@ export function App(): JSX.Element {
         focused={focused}
         tabs={browser.tabs}
         activeTabId={browser.activeTabId}
+        privateSession={browser.privateSession}
       />
-      <Toolbar tab={tab} searchEngineId={DEFAULT_SEARCH_ENGINE_ID} addressRef={addressRef} />
+
+      <Toolbar
+        tab={tab}
+        searchEngineId={settings.searchEngineId}
+        addressRef={addressRef}
+        trailing={
+          <BlockedCount
+            tab={tab}
+            onClick={() => {
+              setPrivacyOpen(true);
+            }}
+          />
+        }
+      />
 
       {/* The page view is positioned over this element by the main process. */}
       <div ref={contentRef} className="relative min-h-0 flex-1 bg-surface">
-        {tab?.internal === 'newtab' ? <NewTabPage /> : null}
+        <ContentRegion tab={tab} />
+        {privacyOpen ? (
+          <PrivacyPanel
+            onClose={() => {
+              setPrivacyOpen(false);
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

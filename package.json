@@ -4,7 +4,7 @@
   "private": true,
   "description": "A privacy-focused desktop web browser.",
   "type": "module",
-  "main": "out/main/index.cjs",
+  "main": "out/main/index.mjs",
   "engines": {
     "node": ">=20"
   },
@@ -19,9 +19,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "prebuild": "node scripts/fetch-filters.mjs --if-missing",
+    "filters:update": "node scripts/fetch-filters.mjs"
   },
   "dependencies": {
+    "@ghostery/adblocker-electron": "^2.18.2",
+    "electron-store": "^11.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

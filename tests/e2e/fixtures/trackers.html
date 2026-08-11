@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tracker Fixture</title>
+  </head>
+  <body>
+    <h1>Tracker fixture</h1>
+    <p>
+      Requests to well-known ad and tracking endpoints. Nothing here should ever load; the point is
+      that the blocker stops them. No real tracking occurs either way — these hosts are contacted
+      only if blocking fails, which is exactly what the test asserts.
+    </p>
+
+    <img src="https://www.google-analytics.com/collect?v=1" alt="" width="1" height="1" />
+    <img src="https://www.googletagmanager.com/gtag/js?id=UA-1" alt="" width="1" height="1" />
+    <img src="https://securepubads.g.doubleclick.net/tag/js/gpt.js" alt="" width="1" height="1" />
+    <img src="https://connect.facebook.net/en_US/fbevents.js" alt="" width="1" height="1" />
+    <img src="https://static.ads-twitter.com/uwt.js" alt="" width="1" height="1" />
+  </body>
+</html>

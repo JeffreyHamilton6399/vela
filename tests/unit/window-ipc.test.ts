@@ -67,12 +67,14 @@ const APP_INFO: AppInfo = {
 interface Harness {
   ipcMain: FakeIpcMain;
   violations: IpcContractError[];
+  privateWindows: boolean[];
   window: WindowLike;
 }
 
 function setup(options: { window?: WindowLike | null; appInfo?: AppInfo } = {}): Harness {
   const ipcMain = new FakeIpcMain();
   const violations: IpcContractError[] = [];
+  const privateWindows: boolean[] = [];
   const window = options.window === undefined ? fakeWindow() : options.window;
 
   registerWindowIpc({
@@ -80,10 +82,13 @@ function setup(options: { window?: WindowLike | null; appInfo?: AppInfo } = {}):
     isTrustedSender: (event) => event.sender === TRUSTED_SENDER,
     onViolation: (error) => violations.push(error),
     getWindow: () => window,
+    openPrivateWindow: () => {
+      privateWindows.push(true);
+    },
     getAppInfo: () => options.appInfo ?? APP_INFO,
   });
 
-  return { ipcMain, violations, window: window ?? fakeWindow() };
+  return { ipcMain, violations, privateWindows, window: window ?? fakeWindow() };
 }
 
 describe('readWindowState', () => {

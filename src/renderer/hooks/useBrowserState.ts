@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BrowserState, TabSnapshot } from '../../shared/types/ipc.js';
 
-const EMPTY: BrowserState = { tabs: [], activeTabId: null };
+const EMPTY: BrowserState = { tabs: [], activeTabId: null, privateSession: false };
 
 export function useBrowserState(): BrowserState {
   const [state, setState] = useState<BrowserState>(EMPTY);

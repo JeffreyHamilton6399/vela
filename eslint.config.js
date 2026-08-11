@@ -31,9 +31,19 @@ export default tseslint.config(
         'error',
         { allowExpressions: true, allowTypedFunctionExpressions: true },
       ],
+    },
+  },
+
+  // The chrome renderer draws UI and nothing else. If it can reach the
+  // network, the "exactly two kinds of request" promise is already broken.
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
       'no-restricted-globals': [
         'error',
         { name: 'fetch', message: 'Vela makes no network requests from the chrome renderer.' },
+        { name: 'XMLHttpRequest', message: 'Vela makes no network requests from the chrome renderer.' },
+        { name: 'WebSocket', message: 'Vela makes no network requests from the chrome renderer.' },
       ],
     },
   },

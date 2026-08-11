@@ -3,28 +3,32 @@ import type { TabManager } from '../tabs/tab-manager.js';
 import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js';
 
 export interface TabIpcDeps extends GuardOptions {
-  getManager: () => TabManager | null;
+  getManager: (sender: unknown) => TabManager | null;
   /** Pops the native tab context menu at the cursor. */
-  popupTabMenu: (manager: TabManager, id: string) => void;
+  popupTabMenu: (manager: TabManager, id: string, sender: unknown) => void;
 }
 
 /** Runs `action` with the live manager, or does nothing if the window is gone. */
-function withManager(deps: TabIpcDeps, action: (manager: TabManager) => void): void {
-  const manager = deps.getManager();
+function withManager(
+  deps: TabIpcDeps,
+  sender: unknown,
+  action: (manager: TabManager) => void,
+): void {
+  const manager = deps.getManager(sender);
   if (manager !== null) action(manager);
 }
 
-const EMPTY_STATE: BrowserState = { tabs: [], activeTabId: null };
+const EMPTY_STATE: BrowserState = { tabs: [], activeTabId: null, privateSession: false };
 
 export function registerTabIpc(deps: TabIpcDeps): void {
   handleInvoke(
     deps,
     INVOKE_CHANNELS.browserGetState,
-    () => deps.getManager()?.state ?? EMPTY_STATE,
+    (_payload, sender) => deps.getManager(sender)?.state ?? EMPTY_STATE,
   );
 
-  handleSend(deps, SEND_CHANNELS.tabsCreate, (payload) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsCreate, (payload, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.create({
         ...(payload.url === undefined ? {} : { url: payload.url }),
         ...(payload.active === undefined ? {} : { active: payload.active }),
@@ -32,98 +36,104 @@ export function registerTabIpc(deps: TabIpcDeps): void {
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsClose, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsClose, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.close(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsActivate, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsActivate, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.activate(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsMove, ({ id, toIndex }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsMove, ({ id, toIndex }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.move(id, toIndex);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsSetPinned, ({ id, pinned }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsSetPinned, ({ id, pinned }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.setPinned(id, pinned);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsRestoreClosed, () => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsRestoreClosed, (_payload, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.restoreClosed();
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsNavigate, ({ id, input }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsNavigate, ({ id, input }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.navigate(id, input);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsGoBack, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsGoBack, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.goBack(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsGoForward, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsGoForward, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.goForward(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsReload, ({ id, ignoreCache }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsReload, ({ id, ignoreCache }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.reload(id, ignoreCache);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsStop, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsStop, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.stop(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsShowNewTab, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsShowNewTab, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.showNewTabPage(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsCloseOthers, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsCloseOthers, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.closeOthers(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.tabsDuplicate, ({ id }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsDuplicate, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.duplicate(id);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.menuTab, ({ id }) => {
-    withManager(deps, (manager) => {
-      deps.popupTabMenu(manager, id);
+  handleSend(deps, SEND_CHANNELS.menuTab, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
+      deps.popupTabMenu(manager, id, sender);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.layoutSetInsets, (insets) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.tabsContinueInsecure, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.continueInsecure(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.layoutSetInsets, (insets, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.setInsets(insets);
     });
   });
 
-  handleSend(deps, SEND_CHANNELS.layoutSetOverlay, ({ open }) => {
-    withManager(deps, (manager) => {
+  handleSend(deps, SEND_CHANNELS.layoutSetOverlay, ({ open }, sender) => {
+    withManager(deps, sender, (manager) => {
       manager.setOverlayOpen(open);
     });
   });
