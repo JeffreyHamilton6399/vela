@@ -16,8 +16,8 @@ test.afterAll(async () => {
 
 test('the window launches and renders the chrome', async () => {
   const page = await app.firstWindow();
-  await expect(page.locator('h1')).toHaveText('Vela');
-  await expect(page.locator('header')).toBeVisible();
+  await expect(page.locator('header')).toContainText('Vela');
+  await expect(page.locator('input[aria-label="Address and search"]')).toBeVisible();
 });
 
 test('the renderer has no Node access', async () => {
@@ -40,7 +40,7 @@ test('the preload bridge is the only surface exposed', async () => {
   const page = await app.firstWindow();
 
   const keys = await page.evaluate(() => Object.keys(Reflect.get(globalThis, 'vela') as object));
-  expect(keys.sort()).toEqual(['app', 'platform', 'window']);
+  expect(keys.sort()).toEqual(['app', 'layout', 'platform', 'tabs', 'window']);
 });
 
 test('a typed IPC round trip works', async () => {

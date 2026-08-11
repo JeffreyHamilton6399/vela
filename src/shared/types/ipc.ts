@@ -35,6 +35,54 @@ export type AppInfo = z.infer<typeof appInfoSchema>;
 /** Payload-less channels use this so the contract stays uniform. */
 export const emptySchema = z.undefined();
 
+/** Vela's own pages, drawn by the chrome renderer rather than loaded as web content. */
+export const internalPageSchema = z.enum(['newtab']);
+export type InternalPage = z.infer<typeof internalPageSchema>;
+
+const tabIdString = z.string().min(1).max(64);
+/** Long enough for any real URL, short enough to bound what crosses the boundary. */
+const addressString = z.string().max(4096);
+
+export const tabSnapshotSchema = z.object({
+  id: tabIdString,
+  url: z.string(),
+  title: z.string(),
+  faviconUrl: z.string().nullable(),
+  loading: z.boolean(),
+  canGoBack: z.boolean(),
+  canGoForward: z.boolean(),
+  pinned: z.boolean(),
+  internal: internalPageSchema.nullable(),
+  blockedCount: z.number().int().nonnegative(),
+});
+export type TabSnapshot = z.infer<typeof tabSnapshotSchema>;
+
+export const browserStateSchema = z.object({
+  tabs: z.array(tabSnapshotSchema),
+  activeTabId: tabIdString.nullable(),
+});
+export type BrowserState = z.infer<typeof browserStateSchema>;
+
+const nonNegative = z.number().nonnegative();
+export const contentInsetsSchema = z.object({
+  top: nonNegative,
+  right: nonNegative,
+  bottom: nonNegative,
+  left: nonNegative,
+});
+export type ContentInsetsPayload = z.infer<typeof contentInsetsSchema>;
+
+export const tabRefSchema = z.object({ id: tabIdString });
+export const tabCreateSchema = z.object({
+  url: addressString.optional(),
+  active: z.boolean().optional(),
+});
+export type TabCreatePayload = z.infer<typeof tabCreateSchema>;
+export const tabNavigateSchema = z.object({ id: tabIdString, input: addressString });
+export const tabReloadSchema = z.object({ id: tabIdString, ignoreCache: z.boolean() });
+export const tabMoveSchema = z.object({ id: tabIdString, toIndex: z.number().int().min(0) });
+export const tabPinSchema = z.object({ id: tabIdString, pinned: z.boolean() });
+
 /* ------------------------------------------------------------------ */
 /* Channels                                                            */
 /* ------------------------------------------------------------------ */
@@ -43,6 +91,7 @@ export const emptySchema = z.undefined();
 export const INVOKE_CHANNELS = {
   appGetInfo: 'app:get-info',
   windowGetState: 'window:get-state',
+  browserGetState: 'browser:get-state',
 } as const;
 
 /** Renderer -> main, fire and forget. */
@@ -50,11 +99,26 @@ export const SEND_CHANNELS = {
   windowMinimize: 'window:minimize',
   windowToggleMaximize: 'window:toggle-maximize',
   windowClose: 'window:close',
+  tabsCreate: 'tabs:create',
+  tabsClose: 'tabs:close',
+  tabsActivate: 'tabs:activate',
+  tabsMove: 'tabs:move',
+  tabsSetPinned: 'tabs:set-pinned',
+  tabsRestoreClosed: 'tabs:restore-closed',
+  tabsNavigate: 'tabs:navigate',
+  tabsGoBack: 'tabs:go-back',
+  tabsGoForward: 'tabs:go-forward',
+  tabsReload: 'tabs:reload',
+  tabsStop: 'tabs:stop',
+  tabsShowNewTab: 'tabs:show-newtab',
+  layoutSetInsets: 'layout:set-insets',
+  layoutSetOverlay: 'layout:set-overlay',
 } as const;
 
 /** Main -> renderer, push. */
 export const EVENT_CHANNELS = {
   windowStateChanged: 'window:state-changed',
+  browserStateChanged: 'browser:state-changed',
 } as const;
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNELS];
@@ -68,16 +132,32 @@ export type EventChannel = (typeof EVENT_CHANNELS)[keyof typeof EVENT_CHANNELS];
 export const invokeContract = {
   [INVOKE_CHANNELS.appGetInfo]: { request: emptySchema, response: appInfoSchema },
   [INVOKE_CHANNELS.windowGetState]: { request: emptySchema, response: windowStateSchema },
+  [INVOKE_CHANNELS.browserGetState]: { request: emptySchema, response: browserStateSchema },
 } as const satisfies Record<InvokeChannel, { request: z.ZodType; response: z.ZodType }>;
 
 export const sendContract = {
   [SEND_CHANNELS.windowMinimize]: emptySchema,
   [SEND_CHANNELS.windowToggleMaximize]: emptySchema,
   [SEND_CHANNELS.windowClose]: emptySchema,
+  [SEND_CHANNELS.tabsCreate]: tabCreateSchema,
+  [SEND_CHANNELS.tabsClose]: tabRefSchema,
+  [SEND_CHANNELS.tabsActivate]: tabRefSchema,
+  [SEND_CHANNELS.tabsMove]: tabMoveSchema,
+  [SEND_CHANNELS.tabsSetPinned]: tabPinSchema,
+  [SEND_CHANNELS.tabsRestoreClosed]: emptySchema,
+  [SEND_CHANNELS.tabsNavigate]: tabNavigateSchema,
+  [SEND_CHANNELS.tabsGoBack]: tabRefSchema,
+  [SEND_CHANNELS.tabsGoForward]: tabRefSchema,
+  [SEND_CHANNELS.tabsReload]: tabReloadSchema,
+  [SEND_CHANNELS.tabsStop]: tabRefSchema,
+  [SEND_CHANNELS.tabsShowNewTab]: tabRefSchema,
+  [SEND_CHANNELS.layoutSetInsets]: contentInsetsSchema,
+  [SEND_CHANNELS.layoutSetOverlay]: z.object({ open: z.boolean() }),
 } as const satisfies Record<SendChannel, z.ZodType>;
 
 export const eventContract = {
   [EVENT_CHANNELS.windowStateChanged]: windowStateSchema,
+  [EVENT_CHANNELS.browserStateChanged]: browserStateSchema,
 } as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.infer<(typeof invokeContract)[C]['request']>;
@@ -114,5 +194,27 @@ export interface VelaBridge {
     close(): void;
     /** Returns an unsubscribe function. */
     onStateChanged(listener: (state: WindowState) => void): () => void;
+  };
+  readonly tabs: {
+    getState(): Promise<BrowserState>;
+    create(options?: TabCreatePayload): void;
+    close(id: string): void;
+    activate(id: string): void;
+    move(id: string, toIndex: number): void;
+    setPinned(id: string, pinned: boolean): void;
+    restoreClosed(): void;
+    navigate(id: string, input: string): void;
+    goBack(id: string): void;
+    goForward(id: string): void;
+    reload(id: string, ignoreCache?: boolean): void;
+    stop(id: string): void;
+    showNewTabPage(id: string): void;
+    onStateChanged(listener: (state: BrowserState) => void): () => void;
+  };
+  readonly layout: {
+    /** Tells main where the page view goes, as insets from the window edges. */
+    setInsets(insets: ContentInsetsPayload): void;
+    /** Hides the page while a chrome overlay owns the content region. */
+    setOverlayOpen(open: boolean): void;
   };
 }

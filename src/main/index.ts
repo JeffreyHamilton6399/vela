@@ -1,9 +1,12 @@
 import path from 'node:path';
-import { BrowserWindow, app, ipcMain, nativeTheme, shell } from 'electron';
-import { EVENT_CHANNELS, type AppInfo } from '../shared/types/ipc.js';
+import { BrowserWindow, app, ipcMain, nativeTheme, session, shell } from 'electron';
+import { EVENT_CHANNELS, type AppInfo, type BrowserState } from '../shared/types/ipc.js';
 import { resolvePlatform } from '../shared/platform.js';
+import { DEFAULT_SEARCH_ENGINE_ID } from '../shared/search-engines.js';
 import { createWindowOptions, SURFACE } from './window-options.js';
 import { registerWindowIpc, readWindowState } from './ipc/register-window-ipc.js';
+import { registerTabIpc } from './ipc/register-tab-ipc.js';
+import { TabManager } from './tabs/tab-manager.js';
 import type { IpcContractError } from './ipc/contract-guard.js';
 
 const PLATFORM = resolvePlatform(process.platform);
@@ -18,6 +21,7 @@ const DEV_SERVER_URL = process.env['VELA_DEV_SERVER_URL'];
 app.setName('Vela');
 
 let mainWindow: BrowserWindow | null = null;
+let tabManager: TabManager | null = null;
 
 function getAppInfo(): AppInfo {
   return {
@@ -36,8 +40,7 @@ function backgroundColor(): string {
 
 /**
  * The chrome renderer draws UI only — it never navigates and never opens
- * windows. Anything that tries goes to the user's real browser instead.
- * (Web content gets its own WebContentsView in stage 2.)
+ * windows. Web content lives in `WebContentsView`s owned by the TabManager.
  */
 function lockDownChrome(window: BrowserWindow): void {
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -80,6 +83,12 @@ function watchWindowState(window: BrowserWindow): void {
   window.on('blur', push);
 }
 
+/** Pushes tab state to the renderer so the strip and toolbar can redraw. */
+function broadcastBrowserState(window: BrowserWindow, state: BrowserState): void {
+  if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+  window.webContents.send(EVENT_CHANNELS.browserStateChanged, state);
+}
+
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow(
     createWindowOptions({
@@ -92,10 +101,22 @@ function createMainWindow(): BrowserWindow {
   lockDownChrome(window);
   watchWindowState(window);
 
+  tabManager = new TabManager({
+    window,
+    session: session.defaultSession,
+    onStateChanged: (state) => {
+      broadcastBrowserState(window, state);
+    },
+    getSearchEngineId: () => DEFAULT_SEARCH_ENGINE_ID,
+  });
+
   window.once('ready-to-show', () => {
     window.show();
   });
+
   window.on('closed', () => {
+    tabManager?.dispose();
+    tabManager = null;
     mainWindow = null;
   });
 
@@ -105,6 +126,11 @@ function createMainWindow(): BrowserWindow {
   } else {
     void window.loadFile(RENDERER_HTML);
   }
+
+  // Open the first tab once the chrome is ready to render it.
+  window.webContents.once('did-finish-load', () => {
+    tabManager?.create();
+  });
 
   return window;
 }
@@ -125,14 +151,15 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
-    registerWindowIpc({
+    const guard = {
       ipcMain,
-      isTrustedSender: (event) =>
+      isTrustedSender: (event: { readonly sender: unknown }) =>
         mainWindow !== null && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents,
       onViolation: onIpcViolation,
-      getWindow: () => mainWindow,
-      getAppInfo,
-    });
+    };
+
+    registerWindowIpc({ ...guard, getWindow: () => mainWindow, getAppInfo });
+    registerTabIpc({ ...guard, getManager: () => tabManager });
 
     nativeTheme.on('updated', () => {
       mainWindow?.setBackgroundColor(backgroundColor());
