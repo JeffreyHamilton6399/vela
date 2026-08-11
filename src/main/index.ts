@@ -13,6 +13,7 @@ import { clearBrowsingData } from './privacy/session-hardening.js';
 import { SettingsStore } from './settings/store.js';
 import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
+import { startDevMetrics } from './dev-metrics.js';
 import { SURFACE } from './window-options.js';
 import { VelaWindow } from './vela-window.js';
 
@@ -206,6 +207,10 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     createWindow({ isPrivate: false });
+
+    startDevMetrics(IS_DEV, () =>
+      [...windows.values()].reduce((total, window) => total + window.manager.count, 0),
+    );
 
     // One check, a few seconds after start, so it never competes with the
     // first paint. Nothing is downloaded unless the user asks.

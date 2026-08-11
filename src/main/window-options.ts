@@ -56,6 +56,8 @@ export function createWindowOptions(input: WindowOptionsInput): BrowserWindowCon
       ...REQUIRED_WEB_PREFERENCES,
       preload: input.preloadPath,
       spellcheck: false,
+      // Cache compiled bytecode so a second launch skips the parse.
+      v8CacheOptions: 'code',
     },
   };
 

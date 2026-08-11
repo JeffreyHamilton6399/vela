@@ -1,15 +1,12 @@
-import { useCallback, useMemo, useRef, useState, type JSX } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef, useState, type JSX } from 'react';
 import type { Settings } from '../shared/settings.js';
 import { findSearchEngine } from '../shared/search-engines.js';
 import type { AddressBarHandle } from './components/AddressBar.js';
 import { BlockedCount } from './components/BlockedCount.js';
-import { CommandPalette } from './components/CommandPalette.js';
 import { IconButton } from './components/IconButton.js';
 import { InsecureInterstitial } from './components/InsecureInterstitial.js';
 import { NewTabPage } from './components/NewTabPage.js';
-import { PrivacyPanel } from './components/PrivacyPanel.js';
-import { SettingsPanel } from './components/SettingsPanel.js';
-import { Sidebar, type SidebarTool } from './components/Sidebar.js';
+import type { SidebarTool } from './components/Sidebar.js';
 import { TitleBar } from './components/TitleBar.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
@@ -20,6 +17,19 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useOverlay } from './hooks/useOverlay.js';
 import { useSettings, useThemePreference } from './hooks/useSettings.js';
 import { useWindowState } from './hooks/useWindowState.js';
+
+// Split out of the initial bundle: none of these exist until asked for, and
+// keeping them out shortens the path to first paint.
+const Sidebar = lazy(async () => ({ default: (await import('./components/Sidebar.js')).Sidebar }));
+const SettingsPanel = lazy(async () => ({
+  default: (await import('./components/SettingsPanel.js')).SettingsPanel,
+}));
+const PrivacyPanel = lazy(async () => ({
+  default: (await import('./components/PrivacyPanel.js')).PrivacyPanel,
+}));
+const CommandPalette = lazy(async () => ({
+  default: (await import('./components/CommandPalette.js')).CommandPalette,
+}));
 
 /** Whatever occupies the content region when a page is not showing. */
 function ContentRegion({
@@ -136,59 +146,61 @@ export function App(): JSX.Element {
 
       <UpdateBanner state={update} />
 
-      <div className="flex min-h-0 flex-1">
-        {/* The page view is positioned over this element by the main process. */}
-        <div
-          ref={contentRef}
-          data-content-region
-          className="relative min-h-0 min-w-0 flex-1 bg-surface"
-        >
-          <ContentRegion tab={tab} settings={settings} />
+      <Suspense fallback={null}>
+        <div className="flex min-h-0 flex-1">
+          {/* The page view is positioned over this element by the main process. */}
+          <div
+            ref={contentRef}
+            data-content-region
+            className="relative min-h-0 min-w-0 flex-1 bg-surface"
+          >
+            <ContentRegion tab={tab} settings={settings} />
 
-          {settingsOpen ? (
-            <SettingsPanel
-              settings={settings}
-              onClose={() => {
-                setSettingsOpen(false);
-              }}
-            />
-          ) : null}
+            {settingsOpen ? (
+              <SettingsPanel
+                settings={settings}
+                onClose={() => {
+                  setSettingsOpen(false);
+                }}
+              />
+            ) : null}
 
-          {privacyOpen ? (
-            <PrivacyPanel
-              onClose={() => {
-                setPrivacyOpen(false);
-              }}
-            />
-          ) : null}
+            {privacyOpen ? (
+              <PrivacyPanel
+                onClose={() => {
+                  setPrivacyOpen(false);
+                }}
+              />
+            ) : null}
 
-          {paletteOpen ? (
-            <CommandPalette
-              browser={browser}
+            {paletteOpen ? (
+              <CommandPalette
+                browser={browser}
+                onClose={() => {
+                  setPaletteOpen(false);
+                }}
+                onOpenSettings={() => {
+                  setSettingsOpen(true);
+                }}
+                onToggleSidebar={() => {
+                  setSidebarOpen((open) => !open);
+                }}
+              />
+            ) : null}
+          </div>
+
+          {sidebarOpen ? (
+            <Sidebar
+              tool={sidebarTool}
+              notes={settings.notes}
+              onSelect={setSidebarTool}
               onClose={() => {
-                setPaletteOpen(false);
-              }}
-              onOpenSettings={() => {
-                setSettingsOpen(true);
-              }}
-              onToggleSidebar={() => {
-                setSidebarOpen((open) => !open);
+                setSidebarOpen(false);
               }}
             />
           ) : null}
         </div>
-
-        {sidebarOpen ? (
-          <Sidebar
-            tool={sidebarTool}
-            notes={settings.notes}
-            onSelect={setSidebarTool}
-            onClose={() => {
-              setSidebarOpen(false);
-            }}
-          />
-        ) : null}
-      </div>
+      </Suspense>
     </div>
   );
 }

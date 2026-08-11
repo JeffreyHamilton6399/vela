@@ -88,6 +88,7 @@ export class Tab {
         session: this.init.session,
         // No `preload` key at all: web content gets no bridge of any kind.
         spellcheck: true,
+        v8CacheOptions: 'code',
       },
     });
 
