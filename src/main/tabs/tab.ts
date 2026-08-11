@@ -8,6 +8,8 @@ export interface TabEvents {
   onChanged: (tab: Tab) => void;
   /** A link that asked for a new tab (target=_blank, window.open). */
   onOpenInNewTab: (url: string, opener: Tab) => void;
+  /** Resolves a locally cached icon for a page; remote icons never reach the UI. */
+  resolveFavicon: (pageUrl: string, iconUrl: string) => void;
   /**
    * Vets a navigation before it happens. Returning a different URL upgrades
    * it; returning null shows the plain-http interstitial instead.
@@ -201,6 +203,13 @@ export class Tab {
     if (!this.destroyed) this.webContents.stop();
   }
 
+  /** Called once a locally cached icon exists for this tab's page. */
+  setCachedFavicon(dataUrl: string | null): void {
+    if (this.faviconUrl === dataUrl) return;
+    this.faviconUrl = dataUrl;
+    this.changed();
+  }
+
   countBlocked(delta: number): void {
     this.blocked += delta;
   }
@@ -249,8 +258,8 @@ export class Tab {
     });
 
     contents.on('page-favicon-updated', (_event, favicons) => {
-      this.faviconUrl = favicons[0] ?? null;
-      this.changed();
+      const icon = favicons[0];
+      if (icon !== undefined) this.events.resolveFavicon(this.currentUrl, icon);
     });
 
     contents.on('did-start-loading', () => {

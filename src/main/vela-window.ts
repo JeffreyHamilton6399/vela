@@ -4,6 +4,7 @@ import { EVENT_CHANNELS, type BrowserState, type WindowState } from '../shared/t
 import type { Platform } from '../shared/types/ipc.js';
 import type { SettingsStore } from './settings/store.js';
 import type { BlockerHandle } from './privacy/adblock.js';
+import type { FaviconCache } from './favicons/favicon-cache.js';
 import { hardenSession } from './privacy/session-hardening.js';
 import { createWindowOptions } from './window-options.js';
 import { readWindowState } from './ipc/register-window-ipc.js';
@@ -20,6 +21,7 @@ export interface VelaWindowOptions {
   isPrivate: boolean;
   settings: SettingsStore;
   blocker: BlockerHandle | null;
+  favicons: FaviconCache | null;
   onClosed: (window: VelaWindow) => void;
   onUnexpectedRequest: (url: string) => void;
 }
@@ -79,6 +81,8 @@ export class VelaWindow {
           options.settings.update({ httpAllowlist: [...current, host] });
         }
       },
+      resolveFavicon: async (pageUrl, iconUrl) =>
+        (await options.favicons?.resolve(pageUrl, iconUrl, this.session)) ?? null,
       isPrivate: options.isPrivate,
     });
 

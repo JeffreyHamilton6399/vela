@@ -11,6 +11,7 @@ import { loadBlocker, type BlockerHandle } from './privacy/adblock.js';
 import { buildUserAgent, UPDATE_FEED_URL } from './privacy/policies.js';
 import { clearBrowsingData } from './privacy/session-hardening.js';
 import { SettingsStore } from './settings/store.js';
+import { FaviconCache } from './favicons/favicon-cache.js';
 import { SURFACE } from './window-options.js';
 import { VelaWindow } from './vela-window.js';
 
@@ -32,6 +33,7 @@ app.setName('Vela');
 const windows = new Map<number, VelaWindow>();
 let settings: SettingsStore | null = null;
 let blocker: BlockerHandle | null = null;
+let favicons: FaviconCache | null = null;
 
 function getAppInfo(): AppInfo {
   return {
@@ -79,6 +81,7 @@ function createWindow(options: { isPrivate: boolean }): VelaWindow {
     isPrivate: options.isPrivate,
     settings,
     blocker,
+    favicons,
     onClosed: (closed) => windows.delete(closed.id),
     onUnexpectedRequest,
   });
@@ -109,6 +112,8 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(async () => {
     settings = new SettingsStore();
+    favicons = new FaviconCache(app.getPath('userData'), true);
+    await favicons.load();
     blocker = await loadBlocker(RESOURCES_DIR);
 
     const guard = {
@@ -149,6 +154,7 @@ if (!app.requestSingleInstanceLock()) {
           userAgent: USER_AGENT,
         };
       },
+      cachedFavicon: (url) => favicons?.get(url) ?? null,
       clearData: async (sender) => {
         const owner = windowFor(sender);
         if (owner === null) return false;

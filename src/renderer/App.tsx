@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type JSX } from 'react';
+import type { Settings } from '../shared/settings.js';
+import { findSearchEngine } from '../shared/search-engines.js';
 import type { AddressBarHandle } from './components/AddressBar.js';
 import { BlockedCount } from './components/BlockedCount.js';
 import { InsecureInterstitial } from './components/InsecureInterstitial.js';
@@ -14,10 +16,24 @@ import { useSettings, useThemePreference } from './hooks/useSettings.js';
 import { useWindowState } from './hooks/useWindowState.js';
 
 /** Whatever occupies the content region when a page is not showing. */
-function ContentRegion({ tab }: { tab: ReturnType<typeof useActiveTab> }): JSX.Element | null {
+function ContentRegion({
+  tab,
+  settings,
+}: {
+  tab: ReturnType<typeof useActiveTab>;
+  settings: Settings;
+}): JSX.Element | null {
   if (tab === null) return null;
   if (tab.interstitialUrl !== null) return <InsecureInterstitial tab={tab} />;
-  if (tab.internal === 'newtab') return <NewTabPage />;
+  if (tab.internal === 'newtab') {
+    return (
+      <NewTabPage
+        tabId={tab.id}
+        tiles={settings.speedDial}
+        searchPlaceholder={`Search ${findSearchEngine(settings.searchEngineId).name}`}
+      />
+    );
+  }
   return null;
 }
 
@@ -68,7 +84,7 @@ export function App(): JSX.Element {
 
       {/* The page view is positioned over this element by the main process. */}
       <div ref={contentRef} className="relative min-h-0 flex-1 bg-surface">
-        <ContentRegion tab={tab} />
+        <ContentRegion tab={tab} settings={settings} />
         {privacyOpen ? (
           <PrivacyPanel
             onClose={() => {

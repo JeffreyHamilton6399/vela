@@ -107,6 +107,11 @@ export const contentInsetsSchema = z.object({
 export type ContentInsetsPayload = z.infer<typeof contentInsetsSchema>;
 
 export const tabRefSchema = z.object({ id: tabIdString });
+export const speedDialAddSchema = z.object({
+  url: addressString,
+  title: z.string().max(120).optional(),
+});
+export type SpeedDialAddPayload = z.infer<typeof speedDialAddSchema>;
 export const tabCreateSchema = z.object({
   url: addressString.optional(),
   active: z.boolean().optional(),
@@ -156,6 +161,9 @@ export const SEND_CHANNELS = {
   tabsCloseOthers: 'tabs:close-others',
   tabsDuplicate: 'tabs:duplicate',
   menuTab: 'menu:tab',
+  speedDialAdd: 'speeddial:add',
+  speedDialRemove: 'speeddial:remove',
+  speedDialMove: 'speeddial:move',
   layoutSetInsets: 'layout:set-insets',
   layoutSetOverlay: 'layout:set-overlay',
 } as const;
@@ -211,6 +219,9 @@ export const sendContract = {
   [SEND_CHANNELS.tabsCloseOthers]: tabRefSchema,
   [SEND_CHANNELS.tabsDuplicate]: tabRefSchema,
   [SEND_CHANNELS.menuTab]: tabRefSchema,
+  [SEND_CHANNELS.speedDialAdd]: speedDialAddSchema,
+  [SEND_CHANNELS.speedDialRemove]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.speedDialMove]: z.object({ id: tabIdString, toIndex: z.number().int().min(0) }),
   [SEND_CHANNELS.layoutSetInsets]: contentInsetsSchema,
   [SEND_CHANNELS.layoutSetOverlay]: z.object({ open: z.boolean() }),
 } as const satisfies Record<SendChannel, z.ZodType>;
@@ -293,6 +304,11 @@ export interface VelaBridge {
     /** Accepts the plain-http interstitial for this tab's host. */
     continueInsecure(id: string): void;
     onStateChanged(listener: (state: BrowserState) => void): () => void;
+  };
+  readonly speedDial: {
+    add(entry: SpeedDialAddPayload): void;
+    remove(id: string): void;
+    move(id: string, toIndex: number): void;
   };
   readonly layout: {
     /** Tells main where the page view goes, as insets from the window edges. */

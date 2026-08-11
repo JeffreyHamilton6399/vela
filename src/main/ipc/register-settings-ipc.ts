@@ -6,12 +6,15 @@ import {
   type SettingsImportResult,
 } from '../../shared/types/ipc.js';
 import type { SettingsStore } from '../settings/store.js';
+import { addTile, moveTile, normalizeUrl, removeTile } from '../speed-dial.js';
 import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js';
 
 export interface SettingsIpcDeps extends GuardOptions {
   getStore: () => SettingsStore | null;
   getReport: (sender: unknown) => PrivacyReport;
   clearData: (sender: unknown) => Promise<boolean>;
+  /** Icon already on this machine for a URL, or null. Never fetches. */
+  cachedFavicon: (url: string) => string | null;
 }
 
 const FALLBACK: Settings = settingsSchema.parse({});
@@ -53,5 +56,32 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
 
   handleSend(deps, SEND_CHANNELS.settingsSet, (patch) => {
     deps.getStore()?.update(patch);
+  });
+
+  handleSend(deps, SEND_CHANNELS.speedDialAdd, (entry) => {
+    const store = deps.getStore();
+    if (store === null) return;
+
+    const normalized = normalizeUrl(entry.url);
+    if (normalized === null) return;
+
+    // Use whatever icon is already cached; a tile is not a reason to make a
+    // request the user did not ask for.
+    const icon = deps.cachedFavicon(normalized);
+    store.update({
+      speedDial: addTile(store.current.speedDial, { url: entry.url, title: entry.title }, icon),
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.speedDialRemove, ({ id }) => {
+    const store = deps.getStore();
+    if (store === null) return;
+    store.update({ speedDial: removeTile(store.current.speedDial, id) });
+  });
+
+  handleSend(deps, SEND_CHANNELS.speedDialMove, ({ id, toIndex }) => {
+    const store = deps.getStore();
+    if (store === null) return;
+    store.update({ speedDial: moveTile(store.current.speedDial, id, toIndex) });
   });
 }

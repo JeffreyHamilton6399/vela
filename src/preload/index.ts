@@ -19,6 +19,7 @@ import {
   windowStateSchema,
   type PrivacyReport,
   type SettingsImportResult,
+  type SpeedDialAddPayload,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -161,6 +162,17 @@ const bridge: VelaBridge = {
     },
     async clearData(): Promise<boolean> {
       return z.boolean().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.privacyClearData));
+    },
+  },
+  speedDial: {
+    add(entry: SpeedDialAddPayload): void {
+      ipcRenderer.send(SEND_CHANNELS.speedDialAdd, entry);
+    },
+    remove(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.speedDialRemove, { id });
+    },
+    move(id: string, toIndex: number): void {
+      ipcRenderer.send(SEND_CHANNELS.speedDialMove, { id, toIndex });
     },
   },
   layout: {

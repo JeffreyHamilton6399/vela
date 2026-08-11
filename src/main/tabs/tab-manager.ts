@@ -30,6 +30,8 @@ export interface TabManagerOptions {
   getHttpsPolicy: () => { enabled: boolean; allowlist: readonly string[] };
   /** Records the user's decision to accept plain http for a host. */
   allowHttpHost: (host: string) => void;
+  /** Turns a page's remote icon into a locally cached data URL. */
+  resolveFavicon: (pageUrl: string, iconUrl: string) => Promise<string | null>;
   isPrivate: boolean;
 }
 
@@ -156,6 +158,12 @@ export class TabManager {
           this.create({ url, active: true, openerId: opener.id });
         },
         vetNavigation: (url) => this.vetNavigation(url),
+        resolveFavicon: (pageUrl, iconUrl) => {
+          void this.options.resolveFavicon(pageUrl, iconUrl).then((dataUrl) => {
+            // The tab may have navigated on while the icon downloaded.
+            if (dataUrl !== null && tab.url === pageUrl) tab.setCachedFavicon(dataUrl);
+          });
+        },
       },
     });
 
