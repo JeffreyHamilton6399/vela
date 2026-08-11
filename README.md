@@ -1,6 +1,6 @@
 # Vela
 
-A privacy-focused desktop web browser. Electron + TypeScript, distributed as a free download via GitHub Releases. No servers, no backend, no accounts — it runs entirely on your machine.
+A privacy-focused desktop web browser. Electron + TypeScript, distributed as a free download via GitHub Releases. No servers, no backend, no hosted accounts — it runs entirely on your machine.
 
 The privacy posture of DuckDuckGo, the visual language of Instagram, the feature set of Opera.
 
@@ -16,7 +16,7 @@ Builds are **not code-signed yet**, so the first launch will be met with a warni
 
 ## What Vela collects
 
-Nothing. There is no account, no server, and no analytics.
+Nothing. There is no server and no analytics, and the only account is a local one that unlocks a file on your own disk.
 
 Out of the box Vela makes exactly **two** kinds of network request:
 
@@ -35,9 +35,9 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 - **Speed Dial** new tab page with locally cached favicons.
 - **Bookmarks** with a bar, **local history** that feeds the command palette, and a **downloads** list.
 - **Per-site zoom** that sticks (`Ctrl+=` / `Ctrl+-` / `Ctrl+0`).
-- **Command palette** (`Ctrl+K`), **sidebar tools** (`Ctrl+B` — assistant, notes, calculator, unit converter), and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
+- **Command palette** (`Ctrl+K`), a **sidebar** (`Ctrl+B`) holding the assistant, notes and the sites you dock, and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
 - **Private windows** (`Ctrl+Shift+N`) on a memory-only session.
-- An **Opera-style left rail**: workspaces at the top, sidebar tools below, privacy and settings pinned to the bottom.
+- An **Opera-style left rail**: workspaces at the top, the assistant and notes below, your docked sites under those, settings at the bottom.
 
 ### The assistant runs locally by default
 
@@ -91,9 +91,11 @@ src/
     address-input.ts      what happens when you type: URL, search, or bang
     bangs.ts              !yt !gh !w …, resolved on this machine
     settings.ts           the whole persisted shape, as one zod schema
-    tools/                calculator and unit conversion, both pure
+    providers.ts          the models and proxies Vela suggests, in one file
   main/
     vela-window.ts        one window: its chrome, its tabs, its session
+    account/              the local vault: scrypt, AES-256-GCM, click-to-fill
+    panels/               sites docked into the sidebar
     tabs/                 tab lifecycle, ordering, layout, suspension policy
     privacy/              policies (pure), session hardening, the blocker
     favicons/             icons cached locally as data URLs
@@ -123,7 +125,7 @@ tests/
 
 The chrome renderer ships a `default-src 'none'; connect-src 'none'` CSP in production, cannot navigate, and cannot open windows. ESLint forbids `fetch`, `XMLHttpRequest` and `WebSocket` in renderer source: if the chrome can reach the network, the two-request promise is already broken.
 
-The sidebar calculator is a hand-written tokenizer and shunting-yard evaluator rather than `eval` — otherwise it would be a code-execution path fed by whatever is in the clipboard. A test asserts that `globalThis`, `require("fs")` and friends are rejected rather than run.
+The password vault never stores the master password, only a separate scrypt derivation used to check it, and holds the encryption key in memory for exactly as long as you are signed in. Filling a login injects a script into one page at the moment you ask, rather than giving every page a permanent bridge.
 
 **Never commit tokens, keys or credentials.** `.gitignore` covers `.env*` and key material. Publishing uses the `GITHUB_TOKEN` that Actions injects automatically — no personal access token is needed anywhere in this project.
 
