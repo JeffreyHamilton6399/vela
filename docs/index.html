@@ -8,10 +8,7 @@
       name="description"
       content="A privacy-focused desktop browser. No servers, no accounts, no telemetry. Free download for Windows, macOS and Linux."
     />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='0.55' stop-color='%23e1306c'/%3E%3Cstop offset='1' stop-color='%23f59e0b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3C/svg%3E"
-    />
+    <link rel="icon" href="icon.png" />
 
     <style>
       :root {
@@ -64,10 +61,9 @@
       }
 
       .mark {
-        width: 56px;
-        height: 56px;
-        border-radius: 16px;
-        background: var(--gradient);
+        display: block;
+        width: 88px;
+        height: 88px;
         margin: 0 auto 24px;
       }
 
@@ -192,7 +188,7 @@
   <body>
     <main>
       <header>
-        <div class="mark" aria-hidden="true"></div>
+        <img class="mark" src="icon.png" alt="" width="88" height="88" />
         <h1>Vela</h1>
         <p class="tagline">A browser that collects nothing. Not “less” — nothing.</p>
 
@@ -245,9 +241,14 @@
           model, and the panel works.
         </p>
         <p>
-          You can point it at a hosted service instead, with your own API key. Vela ships without
-          one on purpose: this is a downloadable app, so a key built into it would sit in the bundle
-          for anyone to read, billed to whoever put it there.
+          Ollama is a separate free program, so Vela cannot bundle it — but if it is missing, the
+          settings panel offers to fetch it and lists models you can download from inside the
+          browser, with their sizes.
+        </p>
+        <p>
+          You can point the assistant at a hosted service instead, with your own API key. Vela ships
+          without one on purpose: this is a downloadable app, so a key built into it would sit in
+          the bundle for anyone to read, billed to whoever put it there.
         </p>
       </section>
 
@@ -289,6 +290,16 @@
           needs a server holding that data. An account is the one thing that turns “a browser on
           your machine” into “a profile someone else keeps”. Export the settings file and move it
           yourself.
+        </p>
+      </section>
+
+      <section>
+        <h2>Where the builds are</h2>
+        <p>
+          <strong>Windows is available now.</strong> macOS and Linux builds are produced by the
+          release workflow on their own machines — they cannot be cross-compiled from a Windows
+          desktop, and are not in 0.1.0. The
+          <a href="https://github.com/JeffreyHamilton6399/vela">repository</a> has the details.
         </p>
       </section>
 

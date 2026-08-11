@@ -225,6 +225,11 @@ const bridge: VelaBridge = {
     async status(): Promise<AssistantStatus> {
       return assistantStatusSchema.parse(await ipcRenderer.invoke(INVOKE_CHANNELS.assistantStatus));
     },
+    async install(): Promise<{ opened: boolean; command: string }> {
+      return z
+        .object({ opened: z.boolean(), command: z.string() })
+        .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.assistantInstall));
+    },
     async pull(model: string): Promise<{ ok: boolean; error: string | null }> {
       return z
         .object({ ok: z.boolean(), error: z.string().nullable() })

@@ -32,6 +32,8 @@ export interface SettingsIpcDeps extends GuardOptions {
   };
   /** Icon already on this machine for a URL, or null. Never fetches. */
   cachedFavicon: (url: string) => string | null;
+  /** Opens Ollama's download page. Vela never runs an installer itself. */
+  openOllamaDownload: () => Promise<{ opened: boolean; command: string }>;
   downloads: {
     list: (sender: unknown) => DownloadItem[];
     open: (sender: unknown, id: string) => void;
@@ -88,6 +90,8 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
   handleInvoke(deps, INVOKE_CHANNELS.assistantAsk, async ({ messages }) =>
     askAssistant(assistantConfig(deps), messages),
   );
+
+  handleInvoke(deps, INVOKE_CHANNELS.assistantInstall, async () => deps.openOllamaDownload());
 
   handleInvoke(deps, INVOKE_CHANNELS.assistantPull, async ({ model }) => pullOllamaModel(model));
 

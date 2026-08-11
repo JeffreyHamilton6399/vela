@@ -208,9 +208,6 @@ export function App(): JSX.Element {
             onOpenSettings={() => {
               setSettingsOpen(true);
             }}
-            onOpenPrivacy={() => {
-              setPrivacyOpen(true);
-            }}
           />
 
           {/* The page view is positioned over this element by the main process. */}

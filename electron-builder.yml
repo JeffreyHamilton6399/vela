@@ -9,6 +9,7 @@ directories:
 # Only what the app actually runs. Sources, tests and configs stay out.
 files:
   - out/**/*
+  - build/icon.png
   - package.json
   - '!**/*.map'
 
@@ -32,6 +33,7 @@ publish:
   releaseType: release
 
 win:
+  icon: build/icon.png
   target:
     - target: nsis
       arch: [x64, arm64]
@@ -44,6 +46,7 @@ nsis:
   deleteAppDataOnUninstall: false
 
 mac:
+  icon: build/icon.png
   target:
     - target: dmg
       arch: [universal]
@@ -53,10 +56,14 @@ mac:
   identity: null
 
 linux:
+  icon: build/icon.png
   target:
     - target: AppImage
       arch: [x64, arm64]
   category: Network;WebBrowser
+  synopsis: A privacy-focused web browser
+  desktopName: vela.desktop
+  syncDesktopName: true
   artifactName: Vela-${version}-linux-${arch}.${ext}
   desktop:
     entry:

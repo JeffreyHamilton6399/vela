@@ -112,6 +112,26 @@ export const GlobeIcon = (props: IconProps): JSX.Element => (
   />
 );
 
+export const LayersIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M8 2 2.5 5 8 8l5.5-3zM2.5 8 8 11l5.5-3M2.5 11 8 14l5.5-3" {...props} />
+);
+
+export const BriefcaseIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M2.5 5.5h11v8h-11zM6 5.5V3.5h4v2M2.5 9h11" {...props} />
+);
+
+export const HomeIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M2.5 7.5 8 2.5l5.5 5M4 8.5v5h8v-5" {...props} />
+);
+
+export const BeakerIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M6.5 2.5v4L3 12.5h10L9.5 6.5v-4M5.5 2.5h5M5 9.5h6" {...props} />
+);
+
+export const BookIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M3 3h4.5c.8 0 1.5.7 1.5 1.5V13c0-.8-.7-1.5-1.5-1.5H3zM13 3H8.5C7.7 3 7 3.7 7 4.5V13c0-.8.7-1.5 1.5-1.5H13z" {...props} />
+);
+
 export const SparkIcon = (props: IconProps): JSX.Element => (
   <Icon
     shape="M8 2v3.2M8 10.8V14M2 8h3.2M10.8 8H14M4.2 4.2l2.2 2.2M9.6 9.6l2.2 2.2M11.8 4.2 9.6 6.4M6.4 9.6l-2.2 2.2"

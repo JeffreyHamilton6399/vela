@@ -65,6 +65,7 @@ function ModelPicker({
 }): JSX.Element {
   const [status, setStatus] = useState<AssistantStatus | null>(null);
   const [pulling, setPulling] = useState<string | null>(null);
+  const [command, setCommand] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = (): void => {
@@ -81,10 +82,39 @@ function ModelPicker({
   return (
     <div className="flex flex-col gap-1 px-1 py-1">
       {status !== null && !status.ready ? (
-        <p className="rounded-lg border border-line bg-raised p-1 text-[12px] leading-relaxed text-ink-muted">
-          Ollama is not running. Install it from <span className="text-ink">ollama.com</span> and
-          start it, then reopen this panel.
-        </p>
+        <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised p-1">
+          <p className="text-[12px] leading-relaxed text-ink-muted">
+            No local model server found. Ollama is a separate free program that runs models on your
+            machine — Vela cannot bundle it, but it is one command away.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                void window.vela.assistant.install().then((result) => {
+                  setCommand(result.command);
+                });
+              }}
+              className="focus-ring rounded-lg bg-ink px-2 py-1 text-[12px] font-medium text-surface hover:opacity-90"
+            >
+              Get Ollama
+            </button>
+            <button
+              type="button"
+              onClick={refresh}
+              className="focus-ring rounded-lg border border-line px-2 py-1 text-[12px] text-ink hover:bg-hover"
+            >
+              Check again
+            </button>
+          </div>
+
+          {command === null ? null : (
+            <p className="text-[11px] leading-relaxed text-ink-muted">
+              Or run <code className="text-ink">{command}</code> — then press “Check again”.
+            </p>
+          )}
+        </div>
       ) : null}
 
       <label className="flex flex-col gap-[3px]">

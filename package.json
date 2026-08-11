@@ -20,10 +20,11 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "verify": "npm run typecheck && npm run lint && npm run test",
-    "prebuild": "node scripts/fetch-filters.mjs --if-missing",
+    "prebuild": "node scripts/make-icon.mjs && node scripts/fetch-filters.mjs --if-missing",
     "filters:update": "node scripts/fetch-filters.mjs",
     "package": "npm run build && electron-builder --publish never",
-    "release": "npm run build && electron-builder --publish always"
+    "release": "npm run build && electron-builder --publish always",
+    "icon": "node scripts/make-icon.mjs"
   },
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.18.2",
@@ -52,5 +53,6 @@
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
-  }
+  },
+  "desktopName": "vela.desktop"
 }

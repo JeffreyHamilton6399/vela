@@ -13,6 +13,7 @@ function optionsFor(platform: Platform): ReturnType<typeof createWindowOptions> 
   return createWindowOptions({
     platform,
     preloadPath: '/app/out/preload/index.cjs',
+    iconPath: '/app/build/icon.png',
     backgroundColor: '#FAFAFA',
   });
 }
@@ -29,6 +30,10 @@ describe('security flags', () => {
 
   it('cannot be mutated at runtime', () => {
     expect(Object.isFrozen(REQUIRED_WEB_PREFERENCES)).toBe(true);
+  });
+
+  it.each(PLATFORMS)('carries the app icon on %s', (platform) => {
+    expect(optionsFor(platform).icon).toBe('/app/build/icon.png');
   });
 
   it.each(PLATFORMS)('wires the preload bridge on %s', (platform) => {

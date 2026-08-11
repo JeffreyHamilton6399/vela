@@ -8,6 +8,8 @@ export interface PanelManagerOptions {
   session: Session;
   /** A panel asked to open a link in a real tab. */
   onOpenInTab: (url: string) => void;
+  /** The panel reported an icon; the caller caches it and stores it. */
+  onFavicon: (id: string, pageUrl: string, iconUrl: string) => void;
 }
 
 /**
@@ -101,6 +103,11 @@ export class PanelManager {
     view.webContents.setWindowOpenHandler(({ url: target }) => {
       this.options.onOpenInTab(target);
       return { action: 'deny' };
+    });
+
+    view.webContents.on('page-favicon-updated', (_event, favicons) => {
+      const icon = favicons[0];
+      if (icon !== undefined) this.options.onFavicon(id, view.webContents.getURL(), icon);
     });
 
     void view.webContents.loadURL(url).catch(() => {

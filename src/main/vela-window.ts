@@ -20,6 +20,7 @@ export interface VelaWindowOptions {
   rendererHtml: string;
   devServerUrl: string | undefined;
   backgroundColor: string;
+  iconPath: string;
   userAgent: string;
   isDev: boolean;
   isPrivate: boolean;
@@ -78,6 +79,7 @@ export class VelaWindow {
         platform: options.platform,
         preloadPath: options.preloadPath,
         backgroundColor: options.backgroundColor,
+        iconPath: options.iconPath,
       }),
     );
 
@@ -136,6 +138,21 @@ export class VelaWindow {
       session: this.session,
       onOpenInTab: (url) => {
         this.manager.create({ url, active: true });
+      },
+      onFavicon: (id, pageUrl, iconUrl) => {
+        // Same rule as tabs: the icon is cached locally and only ever handed
+        // to the UI as a data URL.
+        void options.favicons?.resolve(pageUrl, iconUrl, this.session).then((dataUrl) => {
+          if (dataUrl === null) return;
+          const panels = options.settings.current.webPanels;
+          const existing = panels.find((panel) => panel.id === id);
+          if (existing === undefined || existing.icon === dataUrl) return;
+          options.settings.update({
+            webPanels: panels.map((panel) =>
+              panel.id === id ? { ...panel, icon: dataUrl } : panel,
+            ),
+          });
+        });
       },
     });
 

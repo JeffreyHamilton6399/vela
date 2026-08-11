@@ -33,6 +33,8 @@ export const REQUIRED_WEB_PREFERENCES = Object.freeze({
 } as const);
 
 export interface WindowOptionsInput {
+  /** Absolute path to the app icon; used by Linux and by dev runs. */
+  iconPath: string;
   platform: Platform;
   preloadPath: string;
   /** Resolved from the OS theme by the caller. */
@@ -52,6 +54,7 @@ export function createWindowOptions(input: WindowOptionsInput): BrowserWindowCon
     backgroundColor: input.backgroundColor,
     show: false,
     title: 'Vela',
+    icon: input.iconPath,
     webPreferences: {
       ...REQUIRED_WEB_PREFERENCES,
       preload: input.preloadPath,

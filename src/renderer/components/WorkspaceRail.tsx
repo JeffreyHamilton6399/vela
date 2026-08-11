@@ -3,12 +3,16 @@ import type { WorkspaceSummary } from '../../shared/types/ipc.js';
 import type { WebPanel } from '../../shared/settings.js';
 import type { SidebarTool } from './Sidebar.js';
 import {
+  BeakerIcon,
+  BookIcon,
+  BriefcaseIcon,
   CloseIcon,
+  HomeIcon,
+  LayersIcon,
   GlobeIcon,
   NotesIcon,
   PlusIcon,
   SettingsIcon,
-  ShieldIcon,
   SparkIcon,
 } from './icons.js';
 
@@ -22,10 +26,19 @@ interface WorkspaceRailProps {
   onPickPanel: (id: string) => void;
   onAddPanel: () => void;
   onOpenSettings: () => void;
-  onOpenPrivacy: () => void;
 }
 
-/** The first letter of a workspace, which is all a 32px square has room for. */
+/**
+ * Workspaces get a glyph rather than an initial: two called "Work" and
+ * "Writing" would otherwise be the same letter in the same square.
+ */
+const WORKSPACE_ICONS = [LayersIcon, BriefcaseIcon, HomeIcon, BeakerIcon, BookIcon] as const;
+
+function workspaceIcon(index: number): (typeof WORKSPACE_ICONS)[number] {
+  return WORKSPACE_ICONS[index % WORKSPACE_ICONS.length] ?? LayersIcon;
+}
+
+/** Fallback for a docked site whose favicon has not been cached yet. */
 function initial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
 }
@@ -69,7 +82,6 @@ export function WorkspaceRail({
   onPickPanel,
   onAddPanel,
   onOpenSettings,
-  onOpenPrivacy,
 }: WorkspaceRailProps): JSX.Element {
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,8 +112,9 @@ export function WorkspaceRail({
       aria-label="Workspaces and tools"
       className="flex w-6 shrink-0 flex-col items-center gap-1 border-r border-line bg-raised py-1"
     >
-      {workspaces.map((workspace) => {
+      {workspaces.map((workspace, index) => {
         const active = workspace.id === activeId;
+        const Glyph = workspaceIcon(index);
         return (
           <div key={workspace.id} className="group/ws relative">
             <button
@@ -113,11 +126,11 @@ export function WorkspaceRail({
               onClick={() => {
                 window.vela.workspaces.activate(workspace.id);
               }}
-              className={`focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-[13px] font-semibold transition-colors duration-150 ${
+              className={`focus-ring flex h-4 w-4 items-center justify-center rounded-lg transition-colors duration-150 ${
                 active ? 'bg-hover text-ink' : 'text-ink-muted hover:bg-hover hover:text-ink'
               }`}
             >
-              {initial(workspace.name)}
+              <Glyph width={15} height={15} />
             </button>
 
             {/* One of the two places the Instagram gradient is allowed. */}
@@ -297,16 +310,6 @@ export function WorkspaceRail({
       </div>
 
       <span className="flex-1" />
-
-      <button
-        type="button"
-        title="What Vela collects"
-        aria-label="What Vela collects"
-        onClick={onOpenPrivacy}
-        className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
-      >
-        <ShieldIcon width={15} height={15} />
-      </button>
 
       <button
         type="button"
