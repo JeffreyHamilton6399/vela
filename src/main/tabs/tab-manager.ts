@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { BrowserWindow, Session } from 'electron';
 import type { BrowserState } from '../../shared/types/ipc.js';
+import type { Workspace } from '../../shared/settings.js';
 import { resolveAddressInput } from '../../shared/address-input.js';
 import { decideHttpsUpgrade } from '../privacy/policies.js';
 import {
@@ -11,6 +12,7 @@ import {
   type ContentInsets,
 } from './layout.js';
 import { indexOfTab, insertTab, moveTab, nextActiveId, removeTab, setPinned } from './tab-order.js';
+import { selectTabsToSuspend } from './suspension.js';
 import { Tab } from './tab.js';
 
 export interface CreateTabOptions {
@@ -18,6 +20,7 @@ export interface CreateTabOptions {
   active?: boolean;
   openerId?: string;
   pinned?: boolean;
+  workspaceId?: string;
 }
 
 export interface TabManagerOptions {
@@ -32,14 +35,20 @@ export interface TabManagerOptions {
   allowHttpHost: (host: string) => void;
   /** Turns a page's remote icon into a locally cached data URL. */
   resolveFavicon: (pageUrl: string, iconUrl: string) => Promise<string | null>;
+  getWorkspaces: () => readonly Workspace[];
+  setWorkspaces: (workspaces: Workspace[], activeId: string) => void;
+  getIdleMinutes: () => number;
   isPrivate: boolean;
 }
 
 const MAX_CLOSED_HISTORY = 25;
+/** Roughly how many renderer processes to keep alive at once. */
+const MAX_LIVE_TABS = 10;
+const SUSPEND_TICK_MS = 30_000;
 
 /**
  * Owns every tab in one window: creation, ordering, activation, navigation,
- * and the bounds of the active `WebContentsView`.
+ * workspaces, suspension, and the bounds of the active `WebContentsView`.
  */
 export class TabManager {
   private tabs: Tab[] = [];
@@ -51,66 +60,46 @@ export class TabManager {
   private notifyScheduled = false;
   private overlayOpen = false;
   private disposed = false;
+  private activeWorkspaceId: string;
+  private readonly suspendTimer: NodeJS.Timeout;
 
   constructor(private readonly options: TabManagerOptions) {
+    this.activeWorkspaceId = options.getWorkspaces()[0]?.id ?? 'default';
+
     options.window.on('resize', () => {
       this.applyBounds();
     });
+
+    this.suspendTimer = setInterval(() => {
+      this.suspendIdleTabs();
+    }, SUSPEND_TICK_MS);
+    // A housekeeping timer must never hold the process open by itself.
+    this.suspendTimer.unref();
   }
 
   /* ----------------------------------------------------------------- */
   /* State                                                              */
   /* ----------------------------------------------------------------- */
 
+  /** Only the active workspace's tabs are in the strip. */
+  private get visibleTabs(): Tab[] {
+    return this.tabs.filter((tab) => tab.workspaceId === this.activeWorkspaceId);
+  }
+
   get state(): BrowserState {
+    const workspaces = this.options.getWorkspaces();
+
     return {
-      tabs: this.tabs.map((tab) => tab.snapshot()),
+      tabs: this.visibleTabs.map((tab) => tab.snapshot()),
       activeTabId: this.activeId,
       privateSession: this.options.isPrivate,
+      activeWorkspaceId: this.activeWorkspaceId,
+      workspaces: workspaces.map((workspace) => ({
+        id: workspace.id,
+        name: workspace.name,
+        tabCount: this.tabs.filter((tab) => tab.workspaceId === workspace.id).length,
+      })),
     };
-  }
-
-  /**
-   * Applies the https policy to a navigation. Returns null to let it proceed
-   * untouched, so the caller can tell "no change" from "upgraded".
-   */
-  private vetNavigation(url: string): { url: string } | { interstitial: string } | null {
-    const decision = decideHttpsUpgrade(url, this.options.getHttpsPolicy());
-    switch (decision.action) {
-      case 'upgrade':
-        return { url: decision.url };
-      case 'interstitial':
-        return { interstitial: decision.url };
-      default:
-        return null;
-    }
-  }
-
-  /** Attributes a blocked request to its tab. Returns false if it had none. */
-  countBlocked(webContentsId: number): boolean {
-    const tab = this.tabs.find(
-      (candidate) => !candidate.destroyed && candidate.webContents.id === webContentsId,
-    );
-    if (tab === undefined) return false;
-    tab.countBlocked(1);
-    this.notify();
-    return true;
-  }
-
-  /** Accepts the plain-http warning for this tab's host and loads the page. */
-  continueInsecure(id: string): void {
-    const tab = this.find(id);
-    if (tab === null) return;
-    const pending = tab.pendingInsecureUrl;
-    if (pending === null) return;
-
-    try {
-      this.options.allowHttpHost(new URL(pending).host);
-    } catch {
-      return;
-    }
-    tab.loadUrlUnchecked(pending);
-    this.notify();
   }
 
   get activeTab(): Tab | null {
@@ -118,7 +107,7 @@ export class TabManager {
   }
 
   get count(): number {
-    return this.tabs.length;
+    return this.visibleTabs.length;
   }
 
   get hasClosedTabs(): boolean {
@@ -141,15 +130,57 @@ export class TabManager {
     });
   }
 
+  /**
+   * Applies the https policy to a navigation. Returns null to let it proceed
+   * untouched, so the caller can tell "no change" from "upgraded".
+   */
+  private vetNavigation(url: string): { url: string } | { interstitial: string } | null {
+    const decision = decideHttpsUpgrade(url, this.options.getHttpsPolicy());
+    switch (decision.action) {
+      case 'upgrade':
+        return { url: decision.url };
+      case 'interstitial':
+        return { interstitial: decision.url };
+      default:
+        return null;
+    }
+  }
+
+  /** Attributes a blocked request to its tab. Returns false if it had none. */
+  countBlocked(webContentsId: number): boolean {
+    const tab = this.tabs.find((candidate) => candidate.webContents?.id === webContentsId);
+    if (tab === undefined) return false;
+    tab.countBlocked(1);
+    this.notify();
+    return true;
+  }
+
+  /** Accepts the plain-http warning for this tab's host and loads the page. */
+  continueInsecure(id: string): void {
+    const tab = this.find(id);
+    if (tab === null) return;
+    const pending = tab.pendingInsecureUrl;
+    if (pending === null) return;
+
+    try {
+      this.options.allowHttpHost(new URL(pending).host);
+    } catch {
+      return;
+    }
+    tab.loadUrlUnchecked(pending);
+    this.notify();
+  }
+
   /* ----------------------------------------------------------------- */
   /* Lifecycle                                                          */
   /* ----------------------------------------------------------------- */
 
   create(options: CreateTabOptions = {}): string {
-    const tab = new Tab({
+    const tab: Tab = new Tab({
       id: randomUUID(),
       session: this.options.session,
       pinned: options.pinned ?? false,
+      workspaceId: options.workspaceId ?? this.activeWorkspaceId,
       events: {
         onChanged: () => {
           this.notify();
@@ -196,6 +227,7 @@ export class TabManager {
       if (this.closedUrls.length > MAX_CLOSED_HISTORY) this.closedUrls.shift();
     }
 
+    const visibleIndex = indexOfTab(this.visibleTabs, id);
     this.detach(tab);
     this.tabs = removeTab(this.tabs, id);
     tab.destroy();
@@ -206,18 +238,18 @@ export class TabManager {
     }
 
     this.activeId = null;
-    const next = nextActiveId(this.tabs, index);
+    const next = nextActiveId(this.visibleTabs, visibleIndex);
     if (next !== null) {
       this.activate(next);
     } else {
-      // Never leave the window without a tab.
+      // Never leave a workspace without a tab.
       this.create();
     }
   }
 
-  /** Closes everything except `id`, leaving that tab active. */
+  /** Closes everything except `id` in the same workspace. */
   closeOthers(id: string): void {
-    for (const tab of [...this.tabs]) {
+    for (const tab of [...this.visibleTabs]) {
       if (tab.id !== id) this.close(tab.id);
     }
     this.activate(id);
@@ -245,8 +277,137 @@ export class TabManager {
     const tab = this.find(id);
     if (tab === null) return;
 
+    // Activating a tab in another workspace switches to that workspace.
+    if (tab.workspaceId !== this.activeWorkspaceId) {
+      this.activeWorkspaceId = tab.workspaceId;
+    }
+
     this.activeId = id;
+    tab.lastActiveAt = Date.now();
+    if (tab.suspended) tab.resume();
+
     this.attach(tab);
+    this.notify();
+  }
+
+  /* ----------------------------------------------------------------- */
+  /* Workspaces                                                         */
+  /* ----------------------------------------------------------------- */
+
+  createWorkspace(name: string): void {
+    const workspaces = [...this.options.getWorkspaces(), { id: randomUUID(), name }];
+    const created = workspaces.at(-1);
+    if (created === undefined) return;
+
+    this.options.setWorkspaces(workspaces, created.id);
+    this.activateWorkspace(created.id);
+  }
+
+  renameWorkspace(id: string, name: string): void {
+    const workspaces = this.options
+      .getWorkspaces()
+      .map((workspace) => (workspace.id === id ? { ...workspace, name } : workspace));
+    this.options.setWorkspaces(workspaces, this.activeWorkspaceId);
+    this.notify();
+  }
+
+  /** Deleting a workspace closes its tabs. The last workspace cannot go. */
+  deleteWorkspace(id: string): void {
+    const workspaces = this.options.getWorkspaces();
+    if (workspaces.length <= 1) return;
+
+    for (const tab of this.tabs.filter((candidate) => candidate.workspaceId === id)) {
+      this.detach(tab);
+      this.tabs = removeTab(this.tabs, tab.id);
+      tab.destroy();
+    }
+
+    const remaining = workspaces.filter((workspace) => workspace.id !== id);
+    const next = remaining[0];
+    if (next === undefined) return;
+
+    this.options.setWorkspaces(remaining, next.id);
+    if (this.activeWorkspaceId === id) this.activateWorkspace(next.id);
+    else this.notify();
+  }
+
+  /**
+   * Switches workspace. Everything left behind is suspended, which is the
+   * point: an inactive workspace should not cost a renderer process.
+   */
+  activateWorkspace(id: string): void {
+    if (this.options.getWorkspaces().every((workspace) => workspace.id !== id)) return;
+
+    const leaving = this.activeWorkspaceId;
+    this.activeWorkspaceId = id;
+    this.options.setWorkspaces([...this.options.getWorkspaces()], id);
+
+    if (leaving !== id) {
+      for (const tab of this.tabs.filter((candidate) => candidate.workspaceId === leaving)) {
+        tab.suspend();
+      }
+    }
+
+    const target = this.visibleTabs.find((tab) => tab.id === this.activeId) ?? this.visibleTabs[0];
+    if (target === undefined) {
+      this.activeId = null;
+      if (this.attached !== null) this.detach(this.attached);
+      this.create({ workspaceId: id });
+      return;
+    }
+
+    this.activate(target.id);
+  }
+
+  /** Moves a tab into another workspace, suspending it if it is leaving view. */
+  moveToWorkspace(id: string, workspaceId: string): void {
+    const tab = this.find(id);
+    if (tab === null) return;
+    if (this.options.getWorkspaces().every((workspace) => workspace.id !== workspaceId)) return;
+
+    tab.workspaceId = workspaceId;
+
+    if (workspaceId !== this.activeWorkspaceId) {
+      this.detach(tab);
+      tab.suspend();
+      if (this.activeId === id) {
+        const next = this.visibleTabs[0];
+        this.activeId = null;
+        if (next === undefined) this.create();
+        else this.activate(next.id);
+        return;
+      }
+    }
+
+    this.notify();
+  }
+
+  /* ----------------------------------------------------------------- */
+  /* Suspension                                                         */
+  /* ----------------------------------------------------------------- */
+
+  /** Runs on a timer and after activations; safe to call at any time. */
+  suspendIdleTabs(now = Date.now()): void {
+    if (this.disposed) return;
+
+    const ids = selectTabsToSuspend(
+      this.tabs.map((tab) => ({
+        id: tab.id,
+        suspended: tab.suspended,
+        pinned: tab.pinned,
+        lastActiveAt: tab.lastActiveAt,
+        internal: tab.internal !== null,
+      })),
+      {
+        activeId: this.activeId,
+        now,
+        idleMillis: this.options.getIdleMinutes() * 60_000,
+        maxLiveTabs: MAX_LIVE_TABS,
+      },
+    );
+
+    if (ids.length === 0) return;
+    for (const id of ids) this.find(id)?.suspend();
     this.notify();
   }
 
@@ -256,17 +417,20 @@ export class TabManager {
 
   /** Only the active tab's view is a child of the window. */
   private attach(tab: Tab): void {
-    if (this.attached === tab) {
+    const view = tab.ensureView();
+
+    if (this.attached === tab && this.lastBounds !== null) {
       this.applyBounds();
       this.syncVisibility();
       return;
     }
 
-    if (this.attached !== null) {
-      this.options.window.contentView.removeChildView(this.attached.view);
+    if (this.attached !== null && this.attached !== tab) {
+      const previous = this.attached.view;
+      if (previous !== null) this.options.window.contentView.removeChildView(previous);
     }
 
-    this.options.window.contentView.addChildView(tab.view);
+    this.options.window.contentView.addChildView(view);
     this.attached = tab;
     this.lastBounds = null;
     this.applyBounds();
@@ -275,19 +439,21 @@ export class TabManager {
 
   private detach(tab: Tab): void {
     if (this.attached !== tab) return;
-    this.options.window.contentView.removeChildView(tab.view);
+    const view = tab.view;
+    if (view !== null) this.options.window.contentView.removeChildView(view);
     this.attached = null;
     this.lastBounds = null;
   }
 
   /**
    * The page is hidden — not unloaded — whenever Vela's own UI needs the
-   * content region: the new tab page, or an overlay like the command palette.
+   * content region: the new tab page, an interstitial, or an overlay.
    */
   private syncVisibility(): void {
     if (this.attached === null || this.disposed) return;
-    const showPage = !this.attached.chromeOwnsContent && !this.overlayOpen;
-    this.attached.view.setVisible(showPage);
+    const view = this.attached.view;
+    if (view === null) return;
+    view.setVisible(!this.attached.chromeOwnsContent && !this.overlayOpen);
   }
 
   setOverlayOpen(open: boolean): void {
@@ -324,6 +490,7 @@ export class TabManager {
     if (intent.kind === 'empty') return;
 
     tab.loadUrl(intent.url);
+    if (this.activeId === id) this.attach(tab);
     this.notify();
   }
 
@@ -336,7 +503,10 @@ export class TabManager {
   }
 
   reload(id: string, ignoreCache: boolean): void {
-    this.find(id)?.reload(ignoreCache);
+    const tab = this.find(id);
+    if (tab === null) return;
+    tab.reload(ignoreCache);
+    if (this.activeId === id) this.attach(tab);
   }
 
   stop(id: string): void {
@@ -361,16 +531,20 @@ export class TabManager {
     if (this.attached === null || this.disposed) return;
     if (this.options.window.isDestroyed()) return;
 
+    const view = this.attached.view;
+    if (view === null) return;
+
     const [width = 0, height = 0] = this.options.window.getContentSize();
     const bounds = computeViewBounds({ width, height }, this.insets);
 
     if (this.lastBounds !== null && boundsEqual(this.lastBounds, bounds)) return;
     this.lastBounds = bounds;
-    this.attached.view.setBounds(bounds);
+    view.setBounds(bounds);
   }
 
   dispose(): void {
     this.disposed = true;
+    clearInterval(this.suspendTimer);
     for (const tab of this.tabs) tab.destroy();
     this.tabs = [];
     this.attached = null;

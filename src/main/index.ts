@@ -30,6 +30,13 @@ const USER_AGENT = buildUserAgent(PLATFORM, process.versions.chrome.split('.')[0
 
 app.setName('Vela');
 
+// Lets the E2E suite run against a throwaway profile instead of the real one.
+// Nothing reads this in a packaged build unless the user sets it themselves.
+const USER_DATA_OVERRIDE = process.env['VELA_USER_DATA_DIR'];
+if (USER_DATA_OVERRIDE !== undefined && USER_DATA_OVERRIDE !== '') {
+  app.setPath('userData', USER_DATA_OVERRIDE);
+}
+
 const windows = new Map<number, VelaWindow>();
 let settings: SettingsStore | null = null;
 let blocker: BlockerHandle | null = null;

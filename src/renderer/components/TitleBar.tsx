@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
-import type { Platform, TabSnapshot } from '../../shared/types/ipc.js';
+import type { Platform, TabSnapshot, WorkspaceSummary } from '../../shared/types/ipc.js';
+import { WorkspaceBar } from './WorkspaceBar.js';
 import { ShieldIcon } from './icons.js';
 import { TabStrip } from './TabStrip.js';
 import { WindowControls } from './WindowControls.js';
@@ -11,6 +12,8 @@ interface TitleBarProps {
   tabs: readonly TabSnapshot[];
   activeTabId: string | null;
   privateSession: boolean;
+  workspaces: readonly WorkspaceSummary[];
+  activeWorkspaceId: string;
 }
 
 /**
@@ -25,6 +28,8 @@ export function TitleBar({
   tabs,
   activeTabId,
   privateSession,
+  workspaces,
+  activeWorkspaceId,
 }: TitleBarProps): JSX.Element {
   const isMac = platform === 'darwin';
 
@@ -45,6 +50,11 @@ export function TitleBar({
       ) : null}
 
       <TabStrip tabs={tabs} activeTabId={activeTabId} />
+
+      {workspaces.length > 1 ? (
+        <div className="mx-1 h-3 w-px shrink-0 bg-line" aria-hidden />
+      ) : null}
+      <WorkspaceBar workspaces={workspaces} activeId={activeWorkspaceId} />
 
       {isMac ? <div className="w-1" /> : <WindowControls maximized={maximized} />}
     </header>

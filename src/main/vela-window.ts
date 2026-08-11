@@ -3,6 +3,7 @@ import { BrowserWindow, session as electronSession, shell, type Session } from '
 import { EVENT_CHANNELS, type BrowserState, type WindowState } from '../shared/types/ipc.js';
 import type { Platform } from '../shared/types/ipc.js';
 import type { SettingsStore } from './settings/store.js';
+import type { Workspace } from '../shared/settings.js';
 import type { BlockerHandle } from './privacy/adblock.js';
 import type { FaviconCache } from './favicons/favicon-cache.js';
 import { hardenSession } from './privacy/session-hardening.js';
@@ -24,6 +25,16 @@ export interface VelaWindowOptions {
   favicons: FaviconCache | null;
   onClosed: (window: VelaWindow) => void;
   onUnexpectedRequest: (url: string) => void;
+}
+
+/** There is always at least one workspace; the first run creates it. */
+function ensureWorkspaces(settings: SettingsStore): readonly Workspace[] {
+  const existing = settings.current.workspaces;
+  if (existing.length > 0) return existing;
+
+  const initial: Workspace[] = [{ id: randomUUID(), name: 'Default' }];
+  settings.update({ workspaces: initial, activeWorkspaceId: initial[0]?.id ?? null });
+  return settings.current.workspaces;
 }
 
 /**
@@ -83,6 +94,11 @@ export class VelaWindow {
       },
       resolveFavicon: async (pageUrl, iconUrl) =>
         (await options.favicons?.resolve(pageUrl, iconUrl, this.session)) ?? null,
+      getWorkspaces: () => ensureWorkspaces(options.settings),
+      setWorkspaces: (workspaces, activeId) => {
+        options.settings.update({ workspaces, activeWorkspaceId: activeId });
+      },
+      getIdleMinutes: () => options.settings.current.suspendAfterMinutes,
       isPrivate: options.isPrivate,
     });
 

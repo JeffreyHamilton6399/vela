@@ -18,7 +18,13 @@ function withManager(
   if (manager !== null) action(manager);
 }
 
-const EMPTY_STATE: BrowserState = { tabs: [], activeTabId: null, privateSession: false };
+const EMPTY_STATE: BrowserState = {
+  tabs: [],
+  activeTabId: null,
+  privateSession: false,
+  activeWorkspaceId: 'default',
+  workspaces: [],
+};
 
 export function registerTabIpc(deps: TabIpcDeps): void {
   handleInvoke(
@@ -123,6 +129,36 @@ export function registerTabIpc(deps: TabIpcDeps): void {
   handleSend(deps, SEND_CHANNELS.tabsContinueInsecure, ({ id }, sender) => {
     withManager(deps, sender, (manager) => {
       manager.continueInsecure(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.workspacesCreate, ({ name }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.createWorkspace(name);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.workspacesRename, ({ id, name }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.renameWorkspace(id, name);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.workspacesDelete, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.deleteWorkspace(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.workspacesActivate, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.activateWorkspace(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.tabsSetWorkspace, ({ id, workspaceId }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.moveToWorkspace(id, workspaceId);
     });
   });
 

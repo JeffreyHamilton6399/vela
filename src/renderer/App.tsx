@@ -66,6 +66,8 @@ export function App(): JSX.Element {
         tabs={browser.tabs}
         activeTabId={browser.activeTabId}
         privateSession={browser.privateSession}
+        workspaces={browser.workspaces}
+        activeWorkspaceId={browser.activeWorkspaceId}
       />
 
       <Toolbar

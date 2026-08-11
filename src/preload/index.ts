@@ -164,6 +164,23 @@ const bridge: VelaBridge = {
       return z.boolean().parse(await ipcRenderer.invoke(INVOKE_CHANNELS.privacyClearData));
     },
   },
+  workspaces: {
+    create(name: string): void {
+      ipcRenderer.send(SEND_CHANNELS.workspacesCreate, { name });
+    },
+    rename(id: string, name: string): void {
+      ipcRenderer.send(SEND_CHANNELS.workspacesRename, { id, name });
+    },
+    remove(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.workspacesDelete, { id });
+    },
+    activate(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.workspacesActivate, { id });
+    },
+    moveTab(id: string, workspaceId: string): void {
+      ipcRenderer.send(SEND_CHANNELS.tabsSetWorkspace, { id, workspaceId });
+    },
+  },
   speedDial: {
     add(entry: SpeedDialAddPayload): void {
       ipcRenderer.send(SEND_CHANNELS.speedDialAdd, entry);

@@ -1,17 +1,17 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test';
-
-const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
+import { expect, test, type ElectronApplication } from '@playwright/test';
+import { launchVela } from './launch-app.js';
 
 let app: ElectronApplication;
+let closeApp: () => Promise<void>;
 
 test.beforeAll(async () => {
-  app = await electron.launch({ args: [PROJECT_ROOT] });
+  const launched = await launchVela();
+  app = launched.app;
+  closeApp = launched.close;
 });
 
 test.afterAll(async () => {
-  await app.close();
+  await closeApp();
 });
 
 test('the window launches and renders the chrome', async () => {
@@ -46,8 +46,10 @@ test('the preload bridge is the only surface exposed', async () => {
     'platform',
     'privacy',
     'settings',
+    'speedDial',
     'tabs',
     'window',
+    'workspaces',
   ]);
 });
 

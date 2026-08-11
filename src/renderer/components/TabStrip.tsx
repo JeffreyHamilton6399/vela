@@ -104,7 +104,12 @@ function TabItem({ tab, active, dragging, width, onPointerDown }: TabItemProps):
 
       {tab.pinned ? null : (
         <>
-          <span className="min-w-0 flex-1 truncate text-[12px] leading-none text-ink">
+          <span
+            className={`min-w-0 flex-1 truncate text-[12px] leading-none ${
+              tab.suspended ? 'text-ink-muted' : 'text-ink'
+            }`}
+            title={tab.suspended ? `${tab.title} — suspended` : tab.title}
+          >
             {tab.title}
           </span>
           <button

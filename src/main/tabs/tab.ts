@@ -21,6 +21,7 @@ export interface TabInit {
   id: string;
   session: Session;
   pinned: boolean;
+  workspaceId: string;
   events: TabEvents;
 }
 
@@ -37,14 +38,21 @@ export type InternalPage = 'newtab';
  * One browser tab: a `WebContentsView` plus the metadata the UI needs.
  * Page rendering happens here and nowhere else — the chrome renderer never
  * hosts web content.
+ *
+ * A suspended tab has handed its renderer process back and survives as title,
+ * address and icon until it is opened again.
  */
 export class Tab {
   readonly id: string;
-  readonly view: WebContentsView;
+  workspaceId: string;
 
   pinned: boolean;
   /** Non-null while this tab is showing one of Vela's own pages. */
   internal: InternalPage | null = 'newtab';
+  /** Epoch ms when this tab was last active, which orders suspension. */
+  lastActiveAt = Date.now();
+
+  private currentView: WebContentsView | null = null;
   /** True once a real page has been loaded, so Back/Forward can cross the
    *  boundary between the new tab page and web content. */
   private hasLoadedPage = false;
@@ -57,34 +65,54 @@ export class Tab {
   private blocked = 0;
   private readonly events: TabEvents;
 
-  constructor(init: TabInit) {
+  constructor(private readonly init: TabInit) {
     this.id = init.id;
     this.pinned = init.pinned;
+    this.workspaceId = init.workspaceId;
     this.events = init.events;
+    this.ensureView();
+  }
 
-    this.view = new WebContentsView({
+  /* ----------------------------------------------------------------- */
+  /* The view                                                           */
+  /* ----------------------------------------------------------------- */
+
+  /** Creates the view if this tab is suspended, and returns it either way. */
+  ensureView(): WebContentsView {
+    const existing = this.currentView;
+    if (existing !== null && !existing.webContents.isDestroyed()) return existing;
+
+    const view = new WebContentsView({
       webPreferences: {
         ...REQUIRED_WEB_PREFERENCES,
-        session: init.session,
+        session: this.init.session,
         // No `preload` key at all: web content gets no bridge of any kind.
         spellcheck: true,
       },
     });
 
-    this.view.setBackgroundColor('#ffffff');
-    this.wireEvents();
+    view.setBackgroundColor('#ffffff');
+    this.currentView = view;
+    this.wireEvents(view);
+    return view;
   }
 
-  get webContents(): WebContentsView['webContents'] {
-    return this.view.webContents;
+  /** The live view, or null while suspended. */
+  get view(): WebContentsView | null {
+    return this.currentView;
+  }
+
+  get suspended(): boolean {
+    return this.currentView === null;
+  }
+
+  get webContents(): WebContentsView['webContents'] | null {
+    const view = this.currentView;
+    return view === null || view.webContents.isDestroyed() ? null : view.webContents;
   }
 
   get url(): string {
     return this.currentUrl;
-  }
-
-  get destroyed(): boolean {
-    return this.view.webContents.isDestroyed();
   }
 
   /** True while Vela's own UI, rather than a page, owns the content region. */
@@ -92,8 +120,36 @@ export class Tab {
     return this.internal !== null || this.interstitialUrl !== null;
   }
 
+  /**
+   * Gives the renderer process back. Title, address and icon stay, so the tab
+   * strip is unchanged apart from a dimmed label.
+   */
+  suspend(): void {
+    const view = this.currentView;
+    if (view === null || this.internal !== null) return;
+
+    this.currentView = null;
+    this.loading = false;
+    if (!view.webContents.isDestroyed()) view.webContents.close();
+    this.changed();
+  }
+
+  /** Brings a suspended tab back and reloads the page it was showing. */
+  resume(): void {
+    if (!this.suspended) return;
+    this.ensureView();
+
+    const target = this.currentUrl;
+    if (target !== '' && target !== BLANK && this.internal === null) {
+      this.loadUrlUnchecked(target);
+    }
+    this.changed();
+  }
+
   snapshot(): TabSnapshot {
     const internal = this.internal !== null;
+    const contents = this.webContents;
+
     return {
       id: this.id,
       url: internal ? '' : this.currentUrl,
@@ -106,12 +162,18 @@ export class Tab {
       canGoBack: !internal,
       canGoForward: internal
         ? this.hasLoadedPage
-        : !this.destroyed && this.webContents.navigationHistory.canGoForward(),
+        : (contents?.navigationHistory.canGoForward() ?? false),
       pinned: this.pinned,
       internal: this.internal,
+      suspended: this.suspended,
+      workspaceId: this.workspaceId,
       blockedCount: this.blocked,
     };
   }
+
+  /* ----------------------------------------------------------------- */
+  /* Navigation                                                         */
+  /* ----------------------------------------------------------------- */
 
   /**
    * Loads a URL after the navigation policy has vetted it: https upgrades
@@ -119,8 +181,6 @@ export class Tab {
    * interstitial rather than a silent downgrade.
    */
   loadUrl(url: string): void {
-    if (this.destroyed) return;
-
     const verdict = this.events.vetNavigation(url);
     if (verdict !== null && 'interstitial' in verdict) {
       this.internal = null;
@@ -130,25 +190,20 @@ export class Tab {
       return;
     }
 
-    const target = verdict === null ? url : verdict.url;
-    this.internal = null;
-    this.interstitialUrl = null;
-    this.hasLoadedPage = true;
-    this.currentUrl = target;
-    void this.webContents.loadURL(target).catch(() => {
-      // did-fail-load reports this to the UI; a rejected promise here is noise.
-    });
+    this.loadUrlUnchecked(verdict === null ? url : verdict.url);
   }
 
   /** Loads an address exactly as given, skipping the https upgrade. */
   loadUrlUnchecked(url: string): void {
-    if (this.destroyed) return;
+    const contents = this.ensureView().webContents;
+
     this.internal = null;
     this.interstitialUrl = null;
     this.hasLoadedPage = true;
     this.currentUrl = url;
-    void this.webContents.loadURL(url).catch(() => {
-      /* reported by did-fail-load */
+
+    void contents.loadURL(url).catch(() => {
+      // did-fail-load reports this to the UI; a rejected promise here is noise.
     });
   }
 
@@ -172,14 +227,16 @@ export class Tab {
   private resumePage(): void {
     if (!this.hasLoadedPage) return;
     this.internal = null;
-    if (!this.destroyed) this.currentUrl = this.webContents.getURL();
+    const contents = this.webContents;
+    if (contents !== null) this.currentUrl = contents.getURL();
     this.changed();
   }
 
   goBack(): void {
-    if (this.internal !== null || this.destroyed) return;
-    if (this.webContents.navigationHistory.canGoBack()) {
-      this.webContents.navigationHistory.goBack();
+    if (this.internal !== null) return;
+    const contents = this.webContents;
+    if (contents?.navigationHistory.canGoBack() === true) {
+      contents.navigationHistory.goBack();
       return;
     }
     this.showNewTabPage();
@@ -190,18 +247,25 @@ export class Tab {
       this.resumePage();
       return;
     }
-    if (!this.destroyed) this.webContents.navigationHistory.goForward();
+    this.webContents?.navigationHistory.goForward();
   }
 
   reload(ignoreCache: boolean): void {
-    if (this.destroyed) return;
-    if (ignoreCache) this.webContents.reloadIgnoringCache();
-    else this.webContents.reload();
+    if (this.suspended) {
+      this.resume();
+      return;
+    }
+    const contents = this.webContents;
+    if (contents === null) return;
+    if (ignoreCache) contents.reloadIgnoringCache();
+    else contents.reload();
   }
 
   stop(): void {
-    if (!this.destroyed) this.webContents.stop();
+    this.webContents?.stop();
   }
+
+  /* ----------------------------------------------------------------- */
 
   /** Called once a locally cached icon exists for this tab's page. */
   setCachedFavicon(dataUrl: string | null): void {
@@ -219,16 +283,17 @@ export class Tab {
   }
 
   destroy(): void {
-    if (this.destroyed) return;
-    this.webContents.close();
+    const view = this.currentView;
+    this.currentView = null;
+    if (view !== null && !view.webContents.isDestroyed()) view.webContents.close();
   }
 
   private changed(): void {
     this.events.onChanged(this);
   }
 
-  private wireEvents(): void {
-    const contents = this.webContents;
+  private wireEvents(view: WebContentsView): void {
+    const contents = view.webContents;
 
     applyWebRtcPolicy(contents);
 

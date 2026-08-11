@@ -1,13 +1,8 @@
 import { readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication,
-  type Page,
-} from '@playwright/test';
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { launchVela } from './launch-app.js';
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const FIXTURE_URL = pathToFileURL(
@@ -15,6 +10,7 @@ const FIXTURE_URL = pathToFileURL(
 ).href;
 
 let app: ElectronApplication;
+let closeApp: () => Promise<void>;
 let chrome: Page;
 
 interface Bridge {
@@ -68,13 +64,15 @@ async function snapshotTree(root: string): Promise<Map<string, string>> {
 }
 
 test.beforeAll(async () => {
-  app = await electron.launch({ args: [PROJECT_ROOT] });
+  const launched = await launchVela();
+  app = launched.app;
+  closeApp = launched.close;
   chrome = await app.firstWindow();
   await chrome.waitForSelector('[role="tablist"]');
 });
 
 test.afterAll(async () => {
-  await app.close();
+  await closeApp();
 });
 
 test('the normal window reports a non-private session', async () => {

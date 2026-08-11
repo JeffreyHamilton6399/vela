@@ -1,13 +1,8 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fileURLToPath } from 'node:url';
-import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication,
-  type Page,
-} from '@playwright/test';
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { launchVela } from './launch-app.js';
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const FIXTURE_URL = pathToFileURL(
@@ -15,6 +10,7 @@ const FIXTURE_URL = pathToFileURL(
 ).href;
 
 let app: ElectronApplication;
+let closeApp: () => Promise<void>;
 let chrome: Page;
 
 /** URLs of every live `WebContentsView`, read from the main process. */
@@ -25,13 +21,15 @@ async function loadedUrls(): Promise<string[]> {
 }
 
 test.beforeAll(async () => {
-  app = await electron.launch({ args: [PROJECT_ROOT] });
+  const launched = await launchVela();
+  app = launched.app;
+  closeApp = launched.close;
   chrome = await app.firstWindow();
   await chrome.waitForSelector('input[aria-label="Address and search"]');
 });
 
 test.afterAll(async () => {
-  await app.close();
+  await closeApp();
 });
 
 test('opens on the new tab page with one tab', async () => {

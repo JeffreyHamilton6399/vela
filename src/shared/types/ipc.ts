@@ -73,6 +73,13 @@ const tabIdString = z.string().min(1).max(64);
 /** Long enough for any real URL, short enough to bound what crosses the boundary. */
 const addressString = z.string().max(4096);
 
+export const workspaceSummarySchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(60),
+  tabCount: z.number().int().nonnegative(),
+});
+export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
+
 export const tabSnapshotSchema = z.object({
   id: tabIdString,
   url: z.string(),
@@ -83,6 +90,9 @@ export const tabSnapshotSchema = z.object({
   canGoForward: z.boolean(),
   pinned: z.boolean(),
   internal: internalPageSchema.nullable(),
+  /** A suspended tab has given its renderer process back. */
+  suspended: z.boolean(),
+  workspaceId: z.string().min(1).max(64),
   /** Set when an https upgrade failed and Vela is warning before plain http. */
   interstitialUrl: z.string().nullable(),
   blockedCount: z.number().int().nonnegative(),
@@ -94,6 +104,8 @@ export const browserStateSchema = z.object({
   activeTabId: tabIdString.nullable(),
   /** True in a private window, whose session is memory-only. */
   privateSession: z.boolean(),
+  activeWorkspaceId: z.string().min(1).max(64),
+  workspaces: z.array(workspaceSummarySchema),
 });
 export type BrowserState = z.infer<typeof browserStateSchema>;
 
@@ -161,6 +173,11 @@ export const SEND_CHANNELS = {
   tabsCloseOthers: 'tabs:close-others',
   tabsDuplicate: 'tabs:duplicate',
   menuTab: 'menu:tab',
+  workspacesCreate: 'workspaces:create',
+  workspacesRename: 'workspaces:rename',
+  workspacesDelete: 'workspaces:delete',
+  workspacesActivate: 'workspaces:activate',
+  tabsSetWorkspace: 'tabs:set-workspace',
   speedDialAdd: 'speeddial:add',
   speedDialRemove: 'speeddial:remove',
   speedDialMove: 'speeddial:move',
@@ -219,6 +236,11 @@ export const sendContract = {
   [SEND_CHANNELS.tabsCloseOthers]: tabRefSchema,
   [SEND_CHANNELS.tabsDuplicate]: tabRefSchema,
   [SEND_CHANNELS.menuTab]: tabRefSchema,
+  [SEND_CHANNELS.workspacesCreate]: z.object({ name: z.string().min(1).max(60) }),
+  [SEND_CHANNELS.workspacesRename]: z.object({ id: tabIdString, name: z.string().min(1).max(60) }),
+  [SEND_CHANNELS.workspacesDelete]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.workspacesActivate]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.tabsSetWorkspace]: z.object({ id: tabIdString, workspaceId: tabIdString }),
   [SEND_CHANNELS.speedDialAdd]: speedDialAddSchema,
   [SEND_CHANNELS.speedDialRemove]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.speedDialMove]: z.object({ id: tabIdString, toIndex: z.number().int().min(0) }),
@@ -304,6 +326,14 @@ export interface VelaBridge {
     /** Accepts the plain-http interstitial for this tab's host. */
     continueInsecure(id: string): void;
     onStateChanged(listener: (state: BrowserState) => void): () => void;
+  };
+  readonly workspaces: {
+    create(name: string): void;
+    rename(id: string, name: string): void;
+    remove(id: string): void;
+    activate(id: string): void;
+    /** Moves a tab into another workspace, suspending it on the way out. */
+    moveTab(id: string, workspaceId: string): void;
   };
   readonly speedDial: {
     add(entry: SpeedDialAddPayload): void;
