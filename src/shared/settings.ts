@@ -27,6 +27,14 @@ export const bookmarkSchema = z.object({
 });
 export type Bookmark = z.infer<typeof bookmarkSchema>;
 
+export const webPanelSchema = z.object({
+  id: z.string().min(1).max(64),
+  title: z.string().max(120),
+  url: z.string().max(4096),
+  icon: z.string().max(200_000).nullable(),
+});
+export type WebPanel = z.infer<typeof webPanelSchema>;
+
 export const workspaceSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(60),
@@ -75,17 +83,25 @@ export const settingsSchema = z.object({
   keepHistory: z.boolean().default(true),
 
   /**
-   * The user's own assistant key. Vela ships without one — an embedded key in
-   * a downloadable app is readable by anyone who unzips it.
+   * Where the sidebar assistant runs.  is the default: it talks to a
+   * model on this machine, so it needs no key and makes no request that leaves
+   * the computer.
    */
+  assistantProvider: z.enum(['ollama', 'hosted']).default('ollama'),
+  assistantOllamaModel: z.string().max(120).default('llama3.2'),
+  assistantHostedModel: z.string().max(120).default('llama-3.3-70b-versatile'),
+  /** Only used by the hosted provider. Vela ships without a key. */
   assistantApiKey: z.string().max(400).default(''),
-  assistantModel: z.string().max(120).default('llama-3.3-70b-versatile'),
 
   /**
    * A proxy the user supplies, applied to every session. Vela runs no servers,
    * so it cannot offer a VPN of its own; this is where you point it at yours.
    */
   proxyRules: z.string().max(500).default(''),
+  proxyEnabled: z.boolean().default(false),
+
+  /** Sites docked into the sidebar, in the manner of Opera's web panels. */
+  webPanels: z.array(webPanelSchema).default([]),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -110,9 +126,12 @@ export const settingsPatchSchema = z.object({
   onboardingComplete: z.boolean().optional(),
   showBookmarksBar: z.boolean().optional(),
   keepHistory: z.boolean().optional(),
+  assistantProvider: z.enum(['ollama', 'hosted']).optional(),
+  assistantOllamaModel: z.string().max(120).optional(),
+  assistantHostedModel: z.string().max(120).optional(),
   assistantApiKey: z.string().max(400).optional(),
-  assistantModel: z.string().max(120).optional(),
   proxyRules: z.string().max(500).optional(),
+  proxyEnabled: z.boolean().optional(),
 });
 
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;

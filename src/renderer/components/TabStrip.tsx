@@ -236,7 +236,7 @@ export function TabStrip({ tabs, activeTabId }: TabStripProps): JSX.Element {
         ref={stripRef}
         role="tablist"
         aria-label="Tabs"
-        className="flex min-w-0 items-center gap-[2px] overflow-hidden"
+        className="workspace-enter flex min-w-0 items-center gap-[2px] overflow-hidden"
         onDoubleClick={(event) => {
           // Double clicking empty strip opens a tab, as in every other browser.
           if (event.target === event.currentTarget) window.vela.tabs.create();

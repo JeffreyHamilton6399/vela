@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { BrowserWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import { EVENT_CHANNELS, type AppInfo, type UpdateState } from '../shared/types/ipc.js';
@@ -11,6 +12,8 @@ import { loadBlocker, type BlockerHandle } from './privacy/adblock.js';
 import { buildUserAgent, UPDATE_FEED_URL } from './privacy/policies.js';
 import { clearBrowsingData } from './privacy/session-hardening.js';
 import { SettingsStore } from './settings/store.js';
+import { normalizeUrl } from '../shared/url.js';
+import { defaultTileTitle } from './speed-dial.js';
 import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
 import { HistoryStore } from './history/history-store.js';
@@ -167,6 +170,32 @@ if (!app.requestSingleInstanceLock()) {
     registerTabIpc({
       ...guard,
       getManager: (sender) => windowFor(sender)?.manager ?? null,
+      getPanels: (sender) => windowFor(sender)?.panels ?? null,
+      findPanel: (id) => settings?.current.webPanels.find((panel) => panel.id === id) ?? null,
+      addPanel: (url, title) => {
+        if (settings === null) return;
+        const normalized = normalizeUrl(url);
+        if (normalized === null) return;
+        const existing = settings.current.webPanels;
+        if (existing.some((panel) => panel.url === normalized) || existing.length >= 12) return;
+        settings.update({
+          webPanels: [
+            ...existing,
+            {
+              id: randomUUID(),
+              url: normalized,
+              title: title.trim() === '' ? defaultTileTitle(normalized) : title,
+              icon: favicons?.get(normalized) ?? null,
+            },
+          ],
+        });
+      },
+      removePanel: (id) => {
+        if (settings === null) return;
+        settings.update({
+          webPanels: settings.current.webPanels.filter((panel) => panel.id !== id),
+        });
+      },
       popupTabMenu: (manager, id, sender) => {
         const owner = windowFor(sender);
         if (owner !== null) popupTabMenu(owner.window, manager, id);

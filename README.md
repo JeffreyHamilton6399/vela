@@ -39,16 +39,22 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 - **Private windows** (`Ctrl+Shift+N`) on a memory-only session.
 - An **Opera-style left rail**: workspaces at the top, sidebar tools below, privacy and settings pinned to the bottom.
 
-### The assistant, and why there is no shipped key
+### The assistant runs locally by default
 
-The sidebar assistant talks to an OpenAI-compatible endpoint using **a key you paste into Settings**, stored in your local settings file. Vela ships without one and could not usefully ship with one: this is a downloadable desktop app, so any embedded key sits in `app.asar` for anyone who unzips it, and every download would bill whoever put it there.
+The sidebar assistant defaults to **Ollama on your own machine** — no key, no account, and no request that leaves the computer. Install Ollama, `ollama pull llama3.2`, and the panel works.
 
-It is also the only feature that adds a network destination beyond the two above, which is why it is inert until you enter a key and why the settings panel says so plainly.
+The alternative is a hosted service using **a key you paste into Settings**. Vela ships without one and could not usefully ship with one: this is a downloadable app, so an embedded key sits in `app.asar` for anyone who unzips it and bills whoever put it there.
+
+Only the hosted option adds a network destination beyond the two above, which is why it is not the default.
+
+### Web panels
+
+Dock a site into the sidebar from the rail's globe button, the way Opera does. Each panel is an ordinary `WebContentsView` on the same hardened session a tab uses — same sandbox, same blocking, same referer policy, no preload — simply positioned into the sidebar rectangle. Only the visible panel exists; closing it destroys the view rather than leaving a hidden renderer running.
 
 ### What Vela deliberately does not have
 
 - **No built-in VPN.** A browser-branded "free VPN" is someone else's server seeing all your traffic — the opposite of the point, and it needs infrastructure Vela does not run. Settings has a proxy field instead: point it at a proxy or VPN you already trust and every session goes through it.
-- **No account or sync.** Signing in with an email and syncing across machines needs a server holding your data. Vela has none by design. Settings → _Export_ hands you the whole JSON file to move yourself.
+- **No account, no sign-in, no sync.** An email-and-password login that carries your data between installs needs a server holding that data, and an account tying it to you. Vela has neither, on purpose — an account is the single thing that turns "a browser on your machine" into "a profile someone else keeps". Settings → _Export_ hands you the whole JSON file to move yourself.
 
 Not yet: find in page. It is written, but Chromium's `found-in-page` event does not reach a listener registered from the app's own main bundle in this configuration, so it was removed rather than shipped as a search box that never counts matches.
 

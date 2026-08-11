@@ -8,6 +8,7 @@ import type { BlockerHandle } from './privacy/adblock.js';
 import type { FaviconCache } from './favicons/favicon-cache.js';
 import type { HistoryStore } from './history/history-store.js';
 import { DownloadManager } from './downloads/download-manager.js';
+import { PanelManager } from './panels/panel-manager.js';
 import { hardenSession } from './privacy/session-hardening.js';
 import { createWindowOptions } from './window-options.js';
 import { readWindowState } from './ipc/register-window-ipc.js';
@@ -51,6 +52,7 @@ export class VelaWindow {
   readonly session: Session;
   readonly isPrivate: boolean;
   readonly downloads: DownloadManager;
+  readonly panels: PanelManager;
 
   private blockedTotal = 0;
   private readonly disposers: (() => void)[] = [];
@@ -129,6 +131,14 @@ export class VelaWindow {
       isPrivate: options.isPrivate,
     });
 
+    this.panels = new PanelManager({
+      window: this.window,
+      session: this.session,
+      onOpenInTab: (url) => {
+        this.manager.create({ url, active: true });
+      },
+    });
+
     this.applyProxy();
     this.applyBlocking();
     this.lockDownChrome();
@@ -179,7 +189,8 @@ export class VelaWindow {
 
     const sync = (): void => {
       const rules = settings.current.proxyRules.trim();
-      void this.session.setProxy(rules === '' ? { mode: 'direct' } : { proxyRules: rules });
+      const active = settings.current.proxyEnabled && rules !== '';
+      void this.session.setProxy(active ? { proxyRules: rules } : { mode: 'direct' });
     };
 
     sync();
@@ -269,6 +280,7 @@ export class VelaWindow {
     this.disposers.length = 0;
     this.manager.dispose();
     this.downloads.dispose();
+    this.panels.dispose();
 
     if (this.isPrivate) {
       void this.session.clearStorageData();

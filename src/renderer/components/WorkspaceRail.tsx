@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import type { WorkspaceSummary } from '../../shared/types/ipc.js';
+import type { WebPanel } from '../../shared/settings.js';
 import type { SidebarTool } from './Sidebar.js';
 import {
   CalculatorIcon,
   CloseIcon,
+  GlobeIcon,
   NotesIcon,
   PlusIcon,
   SettingsIcon,
@@ -16,7 +18,11 @@ interface WorkspaceRailProps {
   workspaces: readonly WorkspaceSummary[];
   activeId: string;
   sidebarTool: SidebarTool | null;
+  panels: readonly WebPanel[];
+  openPanelId: string | null;
   onPickTool: (tool: SidebarTool) => void;
+  onPickPanel: (id: string) => void;
+  onAddPanel: () => void;
   onOpenSettings: () => void;
   onOpenPrivacy: () => void;
 }
@@ -45,7 +51,11 @@ export function WorkspaceRail({
   workspaces,
   activeId,
   sidebarTool,
+  panels,
+  openPanelId,
   onPickTool,
+  onPickPanel,
+  onAddPanel,
   onOpenSettings,
   onOpenPrivacy,
 }: WorkspaceRailProps): JSX.Element {
@@ -167,6 +177,54 @@ export function WorkspaceRail({
           {tool.glyph}
         </button>
       ))}
+
+      {panels.length > 0 ? <span aria-hidden className="my-[2px] h-px w-3 bg-line" /> : null}
+
+      {panels.map((panel) => (
+        <div key={panel.id} className="group/panel relative">
+          <button
+            type="button"
+            aria-pressed={openPanelId === panel.id}
+            title={panel.title}
+            aria-label={panel.title}
+            onClick={() => {
+              onPickPanel(panel.id);
+            }}
+            className={`focus-ring flex h-4 w-4 items-center justify-center overflow-hidden rounded-lg transition-colors duration-150 ${
+              openPanelId === panel.id
+                ? 'bg-hover text-ink'
+                : 'text-ink-muted hover:bg-hover hover:text-ink'
+            }`}
+          >
+            {panel.icon === null ? (
+              <span className="text-[11px] font-semibold">{initial(panel.title)}</span>
+            ) : (
+              <img src={panel.icon} alt="" width={15} height={15} className="rounded-[3px]" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            aria-label={`Remove ${panel.title}`}
+            onClick={() => {
+              window.vela.panels.remove(panel.id);
+            }}
+            className="focus-ring absolute -right-[3px] -top-[3px] hidden h-[14px] w-[14px] items-center justify-center rounded-full border border-line bg-raised text-ink-muted hover:text-danger group-hover/panel:flex"
+          >
+            <CloseIcon width={7} height={7} />
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        aria-label="Add a site to the sidebar"
+        title="Add a site to the sidebar"
+        onClick={onAddPanel}
+        className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
+      >
+        <GlobeIcon width={14} height={14} />
+      </button>
 
       <span className="flex-1" />
 

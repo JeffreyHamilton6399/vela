@@ -15,7 +15,8 @@ import { TitleBar } from './components/TitleBar.js';
 import { WorkspaceRail } from './components/WorkspaceRail.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
-import { DownloadIcon } from './components/icons.js';
+import { CloseIcon, DownloadIcon } from './components/icons.js';
+import { usePanelBounds } from './hooks/usePanelBounds.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
@@ -75,12 +76,16 @@ export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [downloadsOpen, setDownloadsOpen] = useState(false);
+  const [openPanelId, setOpenPanelId] = useState<string | null>(null);
+  const [addingPanel, setAddingPanel] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   const downloads = useDownloads();
   const activeDownloads = downloads.filter((item) => item.state === 'progressing').length;
   const bookmark = tab === null ? null : findBookmark(settings.bookmarks, tab.url);
 
   useContentInsets(contentRef);
+  usePanelBounds(sidebarRef, openPanelId !== null);
   // Any of these owns the content region, so the page underneath is hidden
   // rather than left to paint over Vela's own UI.
   useOverlay(paletteOpen || settingsOpen || privacyOpen);
@@ -116,6 +121,7 @@ export function App(): JSX.Element {
         platform={window.vela.platform}
         maximized={maximized}
         focused={focused}
+        key={browser.activeWorkspaceId}
         tabs={browser.tabs}
         activeTabId={browser.activeTabId}
         privateSession={browser.privateSession}
@@ -167,11 +173,34 @@ export function App(): JSX.Element {
           <WorkspaceRail
             workspaces={browser.workspaces}
             activeId={browser.activeWorkspaceId}
-            sidebarTool={sidebarOpen ? sidebarTool : null}
+            sidebarTool={sidebarOpen && openPanelId === null ? sidebarTool : null}
+            panels={settings.webPanels}
+            openPanelId={openPanelId}
+            onPickPanel={(id) => {
+              if (openPanelId === id) {
+                setOpenPanelId(null);
+                setSidebarOpen(false);
+                window.vela.panels.close();
+                return;
+              }
+              setOpenPanelId(id);
+              setSidebarOpen(true);
+              window.vela.panels.open(id);
+            }}
+            onAddPanel={() => {
+              setAddingPanel(true);
+              setOpenPanelId(null);
+              setSidebarTool('panels');
+              setSidebarOpen(true);
+              window.vela.panels.close();
+            }}
             onPickTool={(tool) => {
+              setOpenPanelId(null);
+              window.vela.panels.close();
               // Clicking the tool you are already on closes the panel.
-              if (sidebarOpen && tool === sidebarTool) setSidebarOpen(false);
-              else {
+              if (sidebarOpen && openPanelId === null && tool === sidebarTool) {
+                setSidebarOpen(false);
+              } else {
                 setSidebarTool(tool);
                 setSidebarOpen(true);
               }
@@ -236,16 +265,49 @@ export function App(): JSX.Element {
             ) : null}
           </div>
 
-          {sidebarOpen ? (
+          {sidebarOpen && openPanelId !== null ? (
+            <aside
+              ref={sidebarRef}
+              aria-label="Web panel"
+              className="flex w-[340px] shrink-0 flex-col border-l border-line bg-raised"
+            >
+              <div className="flex h-5 shrink-0 items-center justify-between gap-1 border-b border-line px-2">
+                <span className="truncate text-[13px] font-semibold text-ink">
+                  {settings.webPanels.find((panel) => panel.id === openPanelId)?.title ?? 'Panel'}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Close panel"
+                  onClick={() => {
+                    setOpenPanelId(null);
+                    setSidebarOpen(false);
+                    window.vela.panels.close();
+                  }}
+                  className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
+                >
+                  <CloseIcon width={11} height={11} />
+                </button>
+              </div>
+              {/* The docked site is a WebContentsView, positioned over this. */}
+              <div className="min-h-0 flex-1" />
+            </aside>
+          ) : null}
+
+          {sidebarOpen && openPanelId === null ? (
             <Sidebar
               tool={sidebarTool}
               notes={settings.notes}
-              hasAssistantKey={settings.assistantApiKey.trim() !== ''}
+              panels={settings.webPanels}
+              addingPanel={addingPanel}
+              onAddPanelDone={() => {
+                setAddingPanel(false);
+              }}
               onOpenSettings={() => {
                 setSettingsOpen(true);
               }}
               onClose={() => {
                 setSidebarOpen(false);
+                setAddingPanel(false);
               }}
             />
           ) : null}

@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { calculate, formatNumber } from '../../shared/tools/calculator.js';
 import { convert, findCategory, UNIT_CATEGORIES } from '../../shared/tools/units.js';
+import type { WebPanel } from '../../shared/settings.js';
 import { Assistant } from './Assistant.js';
 import { CloseIcon } from './icons.js';
 
-export type SidebarTool = 'assistant' | 'notes' | 'calculator' | 'units';
+export type SidebarTool = 'assistant' | 'notes' | 'calculator' | 'units' | 'panels';
 
 interface SidebarProps {
   tool: SidebarTool;
   notes: string;
-  hasAssistantKey: boolean;
+  panels: readonly WebPanel[];
+  addingPanel: boolean;
+  onAddPanelDone: () => void;
   onOpenSettings: () => void;
   onClose: () => void;
 }
@@ -18,11 +21,86 @@ const TOOLS: { id: SidebarTool; label: string }[] = [
   { id: 'assistant', label: 'Assistant' },
   { id: 'notes', label: 'Notes' },
   { id: 'calculator', label: 'Calculator' },
-  { id: 'units', label: 'Units' },
+  { id: 'units', label: 'Unit converter' },
+  { id: 'panels', label: 'Sidebar sites' },
 ];
 
 const FIELD =
   'w-full rounded-lg border border-line bg-surface px-1 py-1 text-[13px] text-ink outline-none focus-ring';
+
+/**
+ * Manage the sites docked into the rail — Opera's web panels, which are just
+ * ordinary pages living in the sidebar instead of a tab.
+ */
+function Panels({
+  panels,
+  autoFocus,
+  onDone,
+}: {
+  panels: readonly WebPanel[];
+  autoFocus: boolean;
+  onDone: () => void;
+}): JSX.Element {
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
+
+  return (
+    <div className="flex h-full flex-col gap-2">
+      <form
+        className="flex flex-col gap-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const url = draft.trim();
+          if (url !== '') window.vela.panels.add(url, '');
+          setDraft('');
+          onDone();
+        }}
+      >
+        <label className="flex flex-col gap-[3px]">
+          <span className="text-[13px] text-ink">Site address</span>
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+            }}
+            placeholder="chat.openai.com"
+            spellCheck={false}
+            className={FIELD}
+          />
+        </label>
+        <span className="text-[11px] text-ink-muted">
+          It opens beside the page, on the same hardened session a tab uses.
+        </span>
+      </form>
+
+      {panels.length === 0 ? null : (
+        <ul className="flex flex-col gap-[2px]">
+          {panels.map((panel) => (
+            <li key={panel.id} className="flex items-center gap-1">
+              <span className="min-w-0 flex-1 truncate text-[12px] text-ink" title={panel.url}>
+                {panel.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  window.vela.panels.remove(panel.id);
+                }}
+                className="focus-ring shrink-0 rounded-lg px-1 text-[11px] text-ink-muted hover:bg-hover hover:text-ink"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function Notes({ notes }: { notes: string }): JSX.Element {
   const [text, setText] = useState(notes);
@@ -180,7 +258,9 @@ function Units(): JSX.Element {
 export function Sidebar({
   tool,
   notes,
-  hasAssistantKey,
+  panels,
+  addingPanel,
+  onAddPanelDone,
   onOpenSettings,
   onClose,
 }: SidebarProps): JSX.Element {
@@ -205,12 +285,13 @@ export function Sidebar({
       </div>
 
       <div className="min-h-0 flex-1">
-        {tool === 'assistant' ? (
-          <Assistant hasKey={hasAssistantKey} onOpenSettings={onOpenSettings} />
-        ) : null}
+        {tool === 'assistant' ? <Assistant onOpenSettings={onOpenSettings} /> : null}
         {tool === 'notes' ? <Notes notes={notes} /> : null}
         {tool === 'calculator' ? <Calculator /> : null}
         {tool === 'units' ? <Units /> : null}
+        {tool === 'panels' ? (
+          <Panels panels={panels} autoFocus={addingPanel} onDone={onAddPanelDone} />
+        ) : null}
       </div>
     </aside>
   );

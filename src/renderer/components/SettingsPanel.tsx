@@ -203,50 +203,115 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
 
           <Section title="Assistant">
             <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
-              The sidebar assistant uses <em>your</em> API key, stored in the local settings file
-              below. Vela ships without one: it is a downloadable app, so a key built into it could
-              be read by anyone who unzips the bundle and would be billed to whoever shipped it.
-              <br />
-              <br />
-              This is also the one feature that adds a network destination beyond the two above. It
-              is inert until you enter a key, and only sends what you type into the panel.
+              The sidebar assistant runs on a model of your choosing. The default is a model on
+              <em> this machine</em> — no key, no account, and nothing that leaves the computer.
             </p>
 
-            <label className="flex flex-col gap-[3px] px-1 py-1">
-              <span className="text-[13px] text-ink">API key (api.groq.com)</span>
-              <input
-                type="password"
-                value={settings.assistantApiKey}
-                onChange={(event) => {
-                  set({ assistantApiKey: event.target.value });
-                }}
-                placeholder="gsk_…"
-                spellCheck={false}
-                autoComplete="off"
-                className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
-              />
-            </label>
+            <div className="flex flex-col gap-1 px-1 py-1">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
+                <input
+                  type="radio"
+                  name="assistant-provider"
+                  checked={settings.assistantProvider === 'ollama'}
+                  onChange={() => {
+                    set({ assistantProvider: 'ollama' });
+                  }}
+                  className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
+                />
+                <span className="min-w-0">
+                  <span className="block text-[13px] text-ink">
+                    Local model (Ollama) — recommended
+                  </span>
+                  <span className="block text-[12px] leading-relaxed text-ink-muted">
+                    Talks to Ollama on 127.0.0.1. Install it from ollama.com, then run{' '}
+                    <code>ollama pull {settings.assistantOllamaModel}</code>. No key, and nothing
+                    leaves this machine.
+                  </span>
+                </span>
+              </label>
 
-            <label className="flex flex-col gap-[3px] px-1 py-1">
-              <span className="text-[13px] text-ink">Model</span>
-              <input
-                value={settings.assistantModel}
-                onChange={(event) => {
-                  set({ assistantModel: event.target.value });
-                }}
-                spellCheck={false}
-                className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
-              />
-            </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
+                <input
+                  type="radio"
+                  name="assistant-provider"
+                  checked={settings.assistantProvider === 'hosted'}
+                  onChange={() => {
+                    set({ assistantProvider: 'hosted' });
+                  }}
+                  className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
+                />
+                <span className="min-w-0">
+                  <span className="block text-[13px] text-ink">
+                    Hosted service, with your own key
+                  </span>
+                  <span className="block text-[12px] leading-relaxed text-ink-muted">
+                    Faster and larger, but your messages go to that company. Vela ships without a
+                    key: an embedded one would sit in the app bundle for anyone to read.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {settings.assistantProvider === 'ollama' ? (
+              <label className="flex flex-col gap-[3px] px-1 py-1">
+                <span className="text-[13px] text-ink">Local model name</span>
+                <input
+                  value={settings.assistantOllamaModel}
+                  onChange={(event) => {
+                    set({ assistantOllamaModel: event.target.value });
+                  }}
+                  spellCheck={false}
+                  className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
+                />
+              </label>
+            ) : (
+              <>
+                <label className="flex flex-col gap-[3px] px-1 py-1">
+                  <span className="text-[13px] text-ink">API key</span>
+                  <input
+                    type="password"
+                    value={settings.assistantApiKey}
+                    onChange={(event) => {
+                      set({ assistantApiKey: event.target.value });
+                    }}
+                    placeholder="gsk_…"
+                    spellCheck={false}
+                    autoComplete="off"
+                    className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
+                  />
+                </label>
+                <label className="flex flex-col gap-[3px] px-1 py-1">
+                  <span className="text-[13px] text-ink">Model</span>
+                  <input
+                    value={settings.assistantHostedModel}
+                    onChange={(event) => {
+                      set({ assistantHostedModel: event.target.value });
+                    }}
+                    spellCheck={false}
+                    className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
+                  />
+                </label>
+              </>
+            )}
           </Section>
 
-          <Section title="Proxy">
+          <Section title="Network">
             <p className="px-1 text-[12px] leading-relaxed text-ink-muted">
-              Vela has no servers, so it cannot offer a VPN of its own — a browser-branded “free
-              VPN” is someone else’s server seeing all your traffic, which is the opposite of the
-              point. Point Vela at a proxy or VPN you already trust instead. Leave this empty to
-              connect directly.
+              Vela runs no servers, so it has no VPN of its own to offer — and a browser-branded
+              “free VPN” is someone else’s machine watching all your traffic, which is the thing
+              this browser exists to avoid. Point Vela at a proxy or VPN you already trust and every
+              session, private windows included, goes through it.
             </p>
+
+            <Toggle
+              label="Route traffic through a proxy"
+              description="Applies to new page loads in every window."
+              checked={settings.proxyEnabled}
+              onChange={(next) => {
+                set({ proxyEnabled: next });
+              }}
+            />
+
             <label className="flex flex-col gap-[3px] px-1 py-1">
               <span className="text-[13px] text-ink">Proxy rules</span>
               <input
@@ -254,11 +319,13 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
                 onChange={(event) => {
                   set({ proxyRules: event.target.value });
                 }}
-                placeholder="socks5://127.0.0.1:1080  or  http=proxy:8080;https=proxy:8080"
+                placeholder="socks5://127.0.0.1:1080"
                 spellCheck={false}
                 className="focus-ring rounded-lg border border-line bg-raised px-1 py-1 font-mono text-[12px] text-ink outline-none"
               />
-              <span className="text-[11px] text-ink-muted">Applies to new page loads.</span>
+              <span className="text-[11px] text-ink-muted">
+                Also accepts Chromium syntax, e.g. http=proxy:8080;https=proxy:8080
+              </span>
             </label>
           </Section>
 

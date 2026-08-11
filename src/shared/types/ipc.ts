@@ -51,6 +51,14 @@ export const assistantReplySchema = z.object({
 });
 export type AssistantReply = z.infer<typeof assistantReplySchema>;
 
+export const assistantStatusSchema = z.object({
+  provider: z.enum(['ollama', 'hosted']),
+  ready: z.boolean(),
+  detail: z.string(),
+  models: z.array(z.string()),
+});
+export type AssistantStatus = z.infer<typeof assistantStatusSchema>;
+
 export const settingsImportResultSchema = z.object({
   ok: z.boolean(),
   message: z.string(),
@@ -193,6 +201,7 @@ export const INVOKE_CHANNELS = {
   historySearch: 'history:search',
   historyClear: 'history:clear',
   assistantAsk: 'assistant:ask',
+  assistantStatus: 'assistant:status',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -237,6 +246,11 @@ export const SEND_CHANNELS = {
   updatesDownload: 'updates:download',
   updatesInstall: 'updates:install',
   toolsSetNotes: 'tools:set-notes',
+  panelsOpen: 'panels:open',
+  panelsClose: 'panels:close',
+  panelsAdd: 'panels:add',
+  panelsRemove: 'panels:remove',
+  panelsBounds: 'panels:bounds',
   speedDialAdd: 'speeddial:add',
   speedDialRemove: 'speeddial:remove',
   speedDialMove: 'speeddial:move',
@@ -277,6 +291,7 @@ export const invokeContract = {
     response: z.array(historyEntrySchema),
   },
   [INVOKE_CHANNELS.historyClear]: { request: emptySchema, response: z.boolean() },
+  [INVOKE_CHANNELS.assistantStatus]: { request: emptySchema, response: assistantStatusSchema },
   [INVOKE_CHANNELS.assistantAsk]: {
     request: z.object({ messages: z.array(assistantMessageSchema).max(40) }),
     response: assistantReplySchema,
@@ -325,6 +340,18 @@ export const sendContract = {
   [SEND_CHANNELS.updatesDownload]: emptySchema,
   [SEND_CHANNELS.updatesInstall]: emptySchema,
   [SEND_CHANNELS.toolsSetNotes]: z.object({ text: z.string().max(500_000) }),
+  [SEND_CHANNELS.panelsOpen]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.panelsClose]: emptySchema,
+  [SEND_CHANNELS.panelsAdd]: z.object({ url: addressString, title: z.string().max(120) }),
+  [SEND_CHANNELS.panelsRemove]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.panelsBounds]: z
+    .object({
+      x: nonNegative,
+      y: nonNegative,
+      width: nonNegative,
+      height: nonNegative,
+    })
+    .nullable(),
   [SEND_CHANNELS.speedDialAdd]: speedDialAddSchema,
   [SEND_CHANNELS.speedDialRemove]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.speedDialMove]: z.object({ id: tabIdString, toIndex: z.number().int().min(0) }),
@@ -432,6 +459,8 @@ export interface VelaBridge {
   readonly assistant: {
     /** Uses the key in the local settings file; there is no shipped key. */
     ask(messages: readonly AssistantMessage[]): Promise<AssistantReply>;
+    /** Whether the chosen provider is reachable, and what it can run. */
+    status(): Promise<AssistantStatus>;
   };
   readonly history: {
     search(query: string, limit?: number): Promise<HistoryEntry[]>;
@@ -456,6 +485,15 @@ export interface VelaBridge {
   readonly tools: {
     /** Sidebar notes. Local file, never synced anywhere. */
     setNotes(text: string): void;
+  };
+  readonly panels: {
+    /** Docks a saved site into the sidebar. */
+    open(id: string): void;
+    close(): void;
+    add(url: string, title: string): void;
+    remove(id: string): void;
+    /** Where the sidebar is, so main can position the panel view. */
+    setBounds(bounds: { x: number; y: number; width: number; height: number } | null): void;
   };
   readonly speedDial: {
     add(entry: SpeedDialAddPayload): void;

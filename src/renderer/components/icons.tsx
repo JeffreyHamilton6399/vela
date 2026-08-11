@@ -105,6 +105,13 @@ export const CalculatorIcon = (props: IconProps): JSX.Element => (
   />
 );
 
+export const GlobeIcon = (props: IconProps): JSX.Element => (
+  <Icon
+    shape="M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM2.5 8h11M8 2.5c1.5 1.6 2.2 3.5 2.2 5.5S9.5 11.9 8 13.5C6.5 11.9 5.8 10 5.8 8S6.5 4.1 8 2.5z"
+    {...props}
+  />
+);
+
 export const SparkIcon = (props: IconProps): JSX.Element => (
   <Icon
     shape="M8 2v3.2M8 10.8V14M2 8h3.2M10.8 8H14M4.2 4.2l2.2 2.2M9.6 9.6l2.2 2.2M11.8 4.2 9.6 6.4M6.4 9.6l-2.2 2.2"
@@ -114,7 +121,7 @@ export const SparkIcon = (props: IconProps): JSX.Element => (
 
 export const SettingsIcon = (props: IconProps): JSX.Element => (
   <Icon
-    shape="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 1.5v1.6M8 12.9v1.6M2.9 2.9l1.1 1.1M12 12l1.1 1.1M1.5 8h1.6M12.9 8h1.6M2.9 13.1 4 12M12 4l1.1-1.1"
+    shape="M6.9 1.9h2.2l.25 1.6 1.15.66 1.5-.6 1.1 1.9-1.2 1.05v1.32l1.2 1.05-1.1 1.9-1.5-.6-1.15.66-.25 1.6H6.9l-.25-1.6-1.15-.66-1.5.6-1.1-1.9L4.1 9.43V8.11L2.9 7.06l1.1-1.9 1.5.6 1.15-.66zM8 6.1a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8z"
     {...props}
   />
 );

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
-import type { AssistantMessage } from '../../shared/types/ipc.js';
+import type { AssistantMessage, AssistantStatus } from '../../shared/types/ipc.js';
 
 interface AssistantProps {
-  hasKey: boolean;
   onOpenSettings: () => void;
 }
 
@@ -17,12 +16,24 @@ const FIELD =
  * a key compiled into it would be readable by anyone who unzips the bundle and
  * billed to whoever shipped it.
  */
-export function Assistant({ hasKey, onOpenSettings }: AssistantProps): JSX.Element {
+export function Assistant({ onOpenSettings }: AssistantProps): JSX.Element {
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<AssistantStatus | null>(null);
+
+  // Re-checked whenever the panel opens: Ollama may have been started since.
+  useEffect(() => {
+    let active = true;
+    void window.vela.assistant.status().then((next) => {
+      if (active) setStatus(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -48,19 +59,28 @@ export function Assistant({ hasKey, onOpenSettings }: AssistantProps): JSX.Eleme
     });
   };
 
-  if (!hasKey) {
+  if (status !== null && !status.ready) {
     return (
       <div className="flex h-full flex-col gap-2 text-[13px] leading-relaxed text-ink-muted">
-        <p className="text-ink">The assistant needs your own API key.</p>
-        <p>
-          Vela ships without one. It is a downloadable app, so any key built into it would sit in
-          the bundle for anyone to read — and every download would bill whoever put it there.
-        </p>
-        <p>
-          Paste a key from <span className="text-ink">console.groq.com</span> into Settings and this
-          panel starts working. It is stored in your local settings file and sent only to that
-          service, only when you send a message.
-        </p>
+        {status.provider === 'ollama' ? (
+          <>
+            <p className="text-ink">No local model is running.</p>
+            <p>
+              The assistant defaults to Ollama on this machine, so it needs no key and nothing you
+              type leaves the computer. Install it from <span className="text-ink">ollama.com</span>
+              , then pull a model.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-ink">The hosted provider needs your API key.</p>
+            <p>
+              Vela ships without one: it is a downloadable app, so a key built into it would sit in
+              the bundle for anyone to read, billed to whoever put it there.
+            </p>
+          </>
+        )}
+        <p className="text-[12px]">{status.detail}</p>
         <button
           type="button"
           onClick={onOpenSettings}
@@ -74,6 +94,14 @@ export function Assistant({ hasKey, onOpenSettings }: AssistantProps): JSX.Eleme
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1">
+      {status === null ? null : (
+        <p className="shrink-0 text-[11px] text-ink-muted">
+          {status.provider === 'ollama'
+            ? 'Running locally — nothing leaves this machine.'
+            : status.detail}
+        </p>
+      )}
+
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-line bg-surface p-1">
         {messages.length === 0 ? (
           <p className="p-1 text-[12px] leading-relaxed text-ink-muted">

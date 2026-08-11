@@ -1,8 +1,14 @@
 import { INVOKE_CHANNELS, SEND_CHANNELS, type BrowserState } from '../../shared/types/ipc.js';
 import type { TabManager } from '../tabs/tab-manager.js';
+import type { PanelManager } from '../panels/panel-manager.js';
 import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js';
 
 export interface TabIpcDeps extends GuardOptions {
+  getPanels: (sender: unknown) => PanelManager | null;
+  /** The saved panel list, so open() knows which URL to load. */
+  findPanel: (id: string) => { id: string; url: string } | null;
+  addPanel: (url: string, title: string) => void;
+  removePanel: (id: string) => void;
   getManager: (sender: unknown) => TabManager | null;
   /** Pops the native tab context menu at the cursor. */
   popupTabMenu: (manager: TabManager, id: string, sender: unknown) => void;
@@ -166,6 +172,28 @@ export function registerTabIpc(deps: TabIpcDeps): void {
     withManager(deps, sender, (manager) => {
       manager.setZoom(id, direction);
     });
+  });
+
+  handleSend(deps, SEND_CHANNELS.panelsOpen, ({ id }, sender) => {
+    const panel = deps.findPanel(id);
+    if (panel !== null) deps.getPanels(sender)?.open(panel.id, panel.url);
+  });
+
+  handleSend(deps, SEND_CHANNELS.panelsClose, (_payload, sender) => {
+    deps.getPanels(sender)?.close();
+  });
+
+  handleSend(deps, SEND_CHANNELS.panelsAdd, ({ url, title }) => {
+    deps.addPanel(url, title);
+  });
+
+  handleSend(deps, SEND_CHANNELS.panelsRemove, ({ id }, sender) => {
+    deps.getPanels(sender)?.forget(id);
+    deps.removePanel(id);
+  });
+
+  handleSend(deps, SEND_CHANNELS.panelsBounds, (bounds, sender) => {
+    deps.getPanels(sender)?.setBounds(bounds);
   });
 
   handleSend(deps, SEND_CHANNELS.layoutSetInsets, (insets, sender) => {

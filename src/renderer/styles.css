@@ -68,6 +68,29 @@
   }
 }
 
+@keyframes vela-workspace-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Switching workspace replaces the whole strip and page at once; a short
+   spring-eased fade makes that read as a move rather than a glitch. */
+@utility workspace-enter {
+  animation: vela-workspace-in 220ms var(--ease-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-enter {
+    animation: none;
+  }
+}
+
 @utility drag {
   -webkit-app-region: drag;
 }

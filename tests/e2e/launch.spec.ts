@@ -47,6 +47,7 @@ test('the preload bridge is the only surface exposed', async () => {
     'downloads',
     'history',
     'layout',
+    'panels',
     'platform',
     'privacy',
     'settings',

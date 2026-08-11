@@ -12,7 +12,7 @@ import type { SettingsStore } from '../settings/store.js';
 import { addTile, moveTile, normalizeUrl, removeTile } from '../speed-dial.js';
 import { randomUUID } from 'node:crypto';
 import { addBookmark, moveBookmark, removeBookmark } from '../../shared/bookmarks.js';
-import { askAssistant, DEFAULT_ASSISTANT_MODEL } from '../assistant/assistant.js';
+import { askAssistant, assistantStatus, type AssistantConfig } from '../assistant/assistant.js';
 import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js';
 
 export interface SettingsIpcDeps extends GuardOptions {
@@ -42,6 +42,17 @@ export interface SettingsIpcDeps extends GuardOptions {
 
 const FALLBACK: Settings = settingsSchema.parse({});
 
+/** Reads the assistant configuration out of the live settings store. */
+function assistantConfig(deps: SettingsIpcDeps): AssistantConfig {
+  const current = deps.getStore()?.current ?? FALLBACK;
+  return {
+    provider: current.assistantProvider,
+    ollamaModel: current.assistantOllamaModel,
+    hostedModel: current.assistantHostedModel,
+    apiKey: current.assistantApiKey,
+  };
+}
+
 export function registerSettingsIpc(deps: SettingsIpcDeps): void {
   handleInvoke(deps, INVOKE_CHANNELS.settingsGet, () => deps.getStore()?.current ?? FALLBACK);
 
@@ -69,14 +80,13 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
     return { ok: true, message: 'Settings imported.' };
   });
 
-  handleInvoke(deps, INVOKE_CHANNELS.assistantAsk, async ({ messages }) => {
-    const store = deps.getStore();
-    return askAssistant({
-      apiKey: store?.current.assistantApiKey ?? '',
-      model: store?.current.assistantModel ?? DEFAULT_ASSISTANT_MODEL,
-      messages,
-    });
-  });
+  handleInvoke(deps, INVOKE_CHANNELS.assistantAsk, async ({ messages }) =>
+    askAssistant(assistantConfig(deps), messages),
+  );
+
+  handleInvoke(deps, INVOKE_CHANNELS.assistantStatus, async () =>
+    assistantStatus(assistantConfig(deps)),
+  );
 
   handleInvoke(deps, INVOKE_CHANNELS.privacyGetReport, (_payload, sender) =>
     deps.getReport(sender),

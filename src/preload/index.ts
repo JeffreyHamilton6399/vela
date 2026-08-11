@@ -20,6 +20,7 @@ import {
   downloadItemSchema,
   historyEntrySchema,
   assistantReplySchema,
+  assistantStatusSchema,
   windowStateSchema,
   type PrivacyReport,
   type SettingsImportResult,
@@ -29,6 +30,7 @@ import {
   type HistoryEntry,
   type AssistantMessage,
   type AssistantReply,
+  type AssistantStatus,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -220,6 +222,9 @@ const bridge: VelaBridge = {
     },
   },
   assistant: {
+    async status(): Promise<AssistantStatus> {
+      return assistantStatusSchema.parse(await ipcRenderer.invoke(INVOKE_CHANNELS.assistantStatus));
+    },
     async ask(messages: readonly AssistantMessage[]): Promise<AssistantReply> {
       return assistantReplySchema.parse(
         await ipcRenderer.invoke(INVOKE_CHANNELS.assistantAsk, { messages }),
@@ -279,6 +284,23 @@ const bridge: VelaBridge = {
   tools: {
     setNotes(text: string): void {
       ipcRenderer.send(SEND_CHANNELS.toolsSetNotes, { text });
+    },
+  },
+  panels: {
+    open(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.panelsOpen, { id });
+    },
+    close(): void {
+      ipcRenderer.send(SEND_CHANNELS.panelsClose);
+    },
+    add(url: string, title: string): void {
+      ipcRenderer.send(SEND_CHANNELS.panelsAdd, { url, title });
+    },
+    remove(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.panelsRemove, { id });
+    },
+    setBounds(bounds: { x: number; y: number; width: number; height: number } | null): void {
+      ipcRenderer.send(SEND_CHANNELS.panelsBounds, bounds);
     },
   },
   speedDial: {
