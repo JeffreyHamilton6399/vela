@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { calculate, formatNumber } from '../../shared/tools/calculator.js';
 import { convert, findCategory, UNIT_CATEGORIES } from '../../shared/tools/units.js';
+import { Assistant } from './Assistant.js';
 import { CloseIcon } from './icons.js';
 
-export type SidebarTool = 'notes' | 'calculator' | 'units';
+export type SidebarTool = 'assistant' | 'notes' | 'calculator' | 'units';
 
 interface SidebarProps {
   tool: SidebarTool;
   notes: string;
-  onSelect: (tool: SidebarTool) => void;
+  hasAssistantKey: boolean;
+  onOpenSettings: () => void;
   onClose: () => void;
 }
 
 const TOOLS: { id: SidebarTool; label: string }[] = [
+  { id: 'assistant', label: 'Assistant' },
   { id: 'notes', label: 'Notes' },
   { id: 'calculator', label: 'Calculator' },
   { id: 'units', label: 'Units' },
@@ -174,30 +177,22 @@ function Units(): JSX.Element {
  * The sidebar panel. It sits beside the page rather than over it, so the
  * content insets shrink and the `WebContentsView` is repositioned to match.
  */
-export function Sidebar({ tool, notes, onSelect, onClose }: SidebarProps): JSX.Element {
+export function Sidebar({
+  tool,
+  notes,
+  hasAssistantKey,
+  onOpenSettings,
+  onClose,
+}: SidebarProps): JSX.Element {
   return (
     <aside
       aria-label="Sidebar tools"
       className="flex h-full w-[280px] shrink-0 flex-col gap-2 border-l border-line bg-raised p-2"
     >
       <div className="flex items-center justify-between gap-1">
-        <div className="flex items-center gap-[2px]">
-          {TOOLS.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              aria-current={entry.id === tool ? 'true' : undefined}
-              onClick={() => {
-                onSelect(entry.id);
-              }}
-              className={`focus-ring rounded-lg px-1 py-[3px] text-[12px] transition-colors duration-150 ${
-                entry.id === tool ? 'bg-hover text-ink' : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
+        <h2 className="text-[13px] font-semibold tracking-tight text-ink">
+          {TOOLS.find((entry) => entry.id === tool)?.label ?? 'Tools'}
+        </h2>
 
         <button
           type="button"
@@ -210,6 +205,9 @@ export function Sidebar({ tool, notes, onSelect, onClose }: SidebarProps): JSX.E
       </div>
 
       <div className="min-h-0 flex-1">
+        {tool === 'assistant' ? (
+          <Assistant hasKey={hasAssistantKey} onOpenSettings={onOpenSettings} />
+        ) : null}
         {tool === 'notes' ? <Notes notes={notes} /> : null}
         {tool === 'calculator' ? <Calculator /> : null}
         {tool === 'units' ? <Units /> : null}

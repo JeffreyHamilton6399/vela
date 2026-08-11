@@ -18,12 +18,12 @@ Builds are **not code-signed yet**, so the first launch will be met with a warni
 
 Nothing. There is no account, no server, and no analytics.
 
-Vela makes exactly **two** kinds of network request:
+Out of the box Vela makes exactly **two** kinds of network request:
 
 1. the pages you navigate to, and
 2. one check of the GitHub Releases feed — a plain GET, no query parameters, no install identifier, and a user agent that is the version string and nothing else.
 
-There is no third. In development, a `session.webRequest` assertion logs any request that is neither, so accidental telemetry surfaces while building rather than after shipping.
+A **third** appears only if you choose it: the sidebar assistant, once you paste in your own API key. It is inert until then, and sends only what you type into that panel. In development, a `session.webRequest` assertion logs any request that is none of these, so accidental telemetry surfaces while building rather than after shipping.
 
 Everything Vela remembers lives in one local JSON file. The settings panel prints its path, and the export button hands you its contents verbatim.
 
@@ -35,8 +35,20 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 - **Speed Dial** new tab page with locally cached favicons.
 - **Bookmarks** with a bar, **local history** that feeds the command palette, and a **downloads** list.
 - **Per-site zoom** that sticks (`Ctrl+=` / `Ctrl+-` / `Ctrl+0`).
-- **Command palette** (`Ctrl+K`), **sidebar tools** (`Ctrl+B` — notes, calculator, unit converter), and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
+- **Command palette** (`Ctrl+K`), **sidebar tools** (`Ctrl+B` — assistant, notes, calculator, unit converter), and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
 - **Private windows** (`Ctrl+Shift+N`) on a memory-only session.
+- An **Opera-style left rail**: workspaces at the top, sidebar tools below, privacy and settings pinned to the bottom.
+
+### The assistant, and why there is no shipped key
+
+The sidebar assistant talks to an OpenAI-compatible endpoint using **a key you paste into Settings**, stored in your local settings file. Vela ships without one and could not usefully ship with one: this is a downloadable desktop app, so any embedded key sits in `app.asar` for anyone who unzips it, and every download would bill whoever put it there.
+
+It is also the only feature that adds a network destination beyond the two above, which is why it is inert until you enter a key and why the settings panel says so plainly.
+
+### What Vela deliberately does not have
+
+- **No built-in VPN.** A browser-branded "free VPN" is someone else's server seeing all your traffic — the opposite of the point, and it needs infrastructure Vela does not run. Settings has a proxy field instead: point it at a proxy or VPN you already trust and every session goes through it.
+- **No account or sync.** Signing in with an email and syncing across machines needs a server holding your data. Vela has none by design. Settings → _Export_ hands you the whole JSON file to move yourself.
 
 Not yet: find in page. It is written, but Chromium's `found-in-page` event does not reach a listener registered from the app's own main bundle in this configuration, so it was removed rather than shipped as a search box that never counts matches.
 

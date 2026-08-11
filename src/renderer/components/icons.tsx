@@ -90,6 +90,28 @@ export const ClockIcon = (props: IconProps): JSX.Element => (
   <Icon shape="M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM8 5v3.2l2.2 1.3" {...props} />
 );
 
+export const NotesIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M4 2.5h8v11H4zM6 5.5h4M6 8h4M6 10.5h2" {...props} />
+);
+
+export const UnitsIcon = (props: IconProps): JSX.Element => (
+  <Icon shape="M2.5 6h11M11 3.5 13.5 6 11 8.5M13.5 10.5h-11M5 8 2.5 10.5 5 13" {...props} />
+);
+
+export const CalculatorIcon = (props: IconProps): JSX.Element => (
+  <Icon
+    shape="M3.5 2.5h9v11h-9zM5.5 5.5h5M5.5 8.5h1M7.5 8.5h1M9.5 8.5h1M5.5 11h1M7.5 11h1M9.5 11h1"
+    {...props}
+  />
+);
+
+export const SparkIcon = (props: IconProps): JSX.Element => (
+  <Icon
+    shape="M8 2v3.2M8 10.8V14M2 8h3.2M10.8 8H14M4.2 4.2l2.2 2.2M9.6 9.6l2.2 2.2M11.8 4.2 9.6 6.4M6.4 9.6l-2.2 2.2"
+    {...props}
+  />
+);
+
 export const SettingsIcon = (props: IconProps): JSX.Element => (
   <Icon
     shape="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 1.5v1.6M8 12.9v1.6M2.9 2.9l1.1 1.1M12 12l1.1 1.1M1.5 8h1.6M12.9 8h1.6M2.9 13.1 4 12M12 4l1.1-1.1"

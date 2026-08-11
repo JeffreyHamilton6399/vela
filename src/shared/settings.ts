@@ -73,6 +73,19 @@ export const settingsSchema = z.object({
 
   /** Whether to keep local browsing history at all. */
   keepHistory: z.boolean().default(true),
+
+  /**
+   * The user's own assistant key. Vela ships without one — an embedded key in
+   * a downloadable app is readable by anyone who unzips it.
+   */
+  assistantApiKey: z.string().max(400).default(''),
+  assistantModel: z.string().max(120).default('llama-3.3-70b-versatile'),
+
+  /**
+   * A proxy the user supplies, applied to every session. Vela runs no servers,
+   * so it cannot offer a VPN of its own; this is where you point it at yours.
+   */
+  proxyRules: z.string().max(500).default(''),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -97,6 +110,9 @@ export const settingsPatchSchema = z.object({
   onboardingComplete: z.boolean().optional(),
   showBookmarksBar: z.boolean().optional(),
   keepHistory: z.boolean().optional(),
+  assistantApiKey: z.string().max(400).optional(),
+  assistantModel: z.string().max(120).optional(),
+  proxyRules: z.string().max(500).optional(),
 });
 
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;

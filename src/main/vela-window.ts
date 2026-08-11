@@ -129,6 +129,7 @@ export class VelaWindow {
       isPrivate: options.isPrivate,
     });
 
+    this.applyProxy();
     this.applyBlocking();
     this.lockDownChrome();
     this.watchWindowState();
@@ -167,6 +168,23 @@ export class VelaWindow {
   }
 
   /* ----------------------------------------------------------------- */
+
+  /**
+   * Routes this session through whatever proxy the user configured. Vela runs
+   * no servers of its own, so this is the honest version of a "built-in VPN":
+   * you point it at one you already trust.
+   */
+  private applyProxy(): void {
+    const { settings } = this.options;
+
+    const sync = (): void => {
+      const rules = settings.current.proxyRules.trim();
+      void this.session.setProxy(rules === '' ? { mode: 'direct' } : { proxyRules: rules });
+    };
+
+    sync();
+    this.disposers.push(settings.onChange(sync));
+  }
 
   private applyBlocking(): void {
     const { blocker, settings } = this.options;

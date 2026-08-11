@@ -122,14 +122,19 @@ export function decideHttpsUpgrade(
 /* The two allowed network categories                                  */
 /* ------------------------------------------------------------------ */
 
-export const UPDATE_FEED_URL = 'https://api.github.com/repos/vela-browser/vela/releases/latest';
+export const UPDATE_FEED_URL =
+  'https://api.github.com/repos/JeffreyHamilton6399/vela/releases/latest';
 
-export type RequestCategory = 'page' | 'update' | 'unexpected';
+/** The assistant's endpoint, contacted only when the user has set a key. */
+export const ASSISTANT_HOST = 'api.groq.com';
+
+export type RequestCategory = 'page' | 'update' | 'assistant' | 'unexpected';
 
 /**
- * Vela makes exactly two kinds of request: pages the user navigated to, and
- * the update check. Anything else is a bug, and in development it is reported
- * as one rather than quietly going out.
+ * Vela makes two kinds of request on its own account: pages the user navigated
+ * to, and the update check — plus the assistant, if and only if the user has
+ * entered their own key. Anything else is a bug, and in development it is
+ * reported as one rather than quietly going out.
  */
 export function categorizeRequest(input: {
   url: string;
@@ -137,6 +142,7 @@ export function categorizeRequest(input: {
   fromWebContents: boolean;
 }): RequestCategory {
   if (input.url.startsWith(UPDATE_FEED_URL)) return 'update';
+  if (input.url.includes(ASSISTANT_HOST)) return 'assistant';
   if (input.fromWebContents) return 'page';
   return 'unexpected';
 }

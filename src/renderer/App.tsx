@@ -12,9 +12,10 @@ import { InsecureInterstitial } from './components/InsecureInterstitial.js';
 import { NewTabPage } from './components/NewTabPage.js';
 import type { SidebarTool } from './components/Sidebar.js';
 import { TitleBar } from './components/TitleBar.js';
+import { WorkspaceRail } from './components/WorkspaceRail.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
-import { DownloadIcon, SettingsIcon, SidebarIcon } from './components/icons.js';
+import { DownloadIcon } from './components/icons.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
@@ -118,8 +119,6 @@ export function App(): JSX.Element {
         tabs={browser.tabs}
         activeTabId={browser.activeTabId}
         privateSession={browser.privateSession}
-        workspaces={browser.workspaces}
-        activeWorkspaceId={browser.activeWorkspaceId}
       />
 
       <Toolbar
@@ -153,22 +152,6 @@ export function App(): JSX.Element {
             >
               <DownloadIcon />
             </IconButton>
-            <IconButton
-              label="Toggle sidebar"
-              onClick={() => {
-                setSidebarOpen((open) => !open);
-              }}
-            >
-              <SidebarIcon />
-            </IconButton>
-            <IconButton
-              label="Settings"
-              onClick={() => {
-                setSettingsOpen(true);
-              }}
-            >
-              <SettingsIcon />
-            </IconButton>
           </>
         }
       />
@@ -181,6 +164,26 @@ export function App(): JSX.Element {
 
       <Suspense fallback={null}>
         <div className="flex min-h-0 flex-1">
+          <WorkspaceRail
+            workspaces={browser.workspaces}
+            activeId={browser.activeWorkspaceId}
+            sidebarTool={sidebarOpen ? sidebarTool : null}
+            onPickTool={(tool) => {
+              // Clicking the tool you are already on closes the panel.
+              if (sidebarOpen && tool === sidebarTool) setSidebarOpen(false);
+              else {
+                setSidebarTool(tool);
+                setSidebarOpen(true);
+              }
+            }}
+            onOpenSettings={() => {
+              setSettingsOpen(true);
+            }}
+            onOpenPrivacy={() => {
+              setPrivacyOpen(true);
+            }}
+          />
+
           {/* The page view is positioned over this element by the main process. */}
           <div
             ref={contentRef}
@@ -237,7 +240,10 @@ export function App(): JSX.Element {
             <Sidebar
               tool={sidebarTool}
               notes={settings.notes}
-              onSelect={setSidebarTool}
+              hasAssistantKey={settings.assistantApiKey.trim() !== ''}
+              onOpenSettings={() => {
+                setSettingsOpen(true);
+              }}
               onClose={() => {
                 setSidebarOpen(false);
               }}

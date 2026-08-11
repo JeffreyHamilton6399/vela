@@ -1,5 +1,5 @@
 import { resolveBang } from './bangs.js';
-import { buildSearchUrl, findSearchEngine } from './search-engines.js';
+import { buildSearchUrl, findSearchEngine, SEARCH_ENGINES } from './search-engines.js';
 
 /**
  * Turns whatever the user typed into either a URL to navigate to or a search.
@@ -74,6 +74,55 @@ export function resolveAddressInput(rawInput: string, searchEngineId: string): A
     query: input,
     url: buildSearchUrl(findSearchEngine(searchEngineId), input),
   };
+}
+
+/**
+ * What the address bar should read for a page.
+ *
+ * On a results page it shows the terms you searched for rather than the
+ * engine's raw query string — `bing.com/search?q=how+to+...&form=QBLH&sp=-1`
+ * tells you nothing you did not already know, and buries the one part you
+ * might want to edit.
+ */
+export function describeAddress(url: string): { kind: 'search' | 'url'; text: string } {
+  const query = searchTermsFor(url);
+  if (query !== null) return { kind: 'search', text: query };
+  return { kind: 'url', text: displayUrl(url) };
+}
+
+/** The search terms in a results URL, if this looks like one. */
+export function searchTermsFor(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  const engine = SEARCH_ENGINES.find((candidate) => {
+    try {
+      return new URL(candidate.template.replace('{query}', 'x')).host === parsed.host;
+    } catch {
+      return false;
+    }
+  });
+  if (engine === undefined) return null;
+
+  // Use the parameter the engine's own template uses, so a host that serves
+  // several kinds of page only matches its real results URL.
+  let parameter: string | null = null;
+  try {
+    const templateUrl = new URL(engine.template.replace('{query}', 'VELA_QUERY'));
+    for (const [key, value] of templateUrl.searchParams) {
+      if (value === 'VELA_QUERY') parameter = key;
+    }
+  } catch {
+    return null;
+  }
+
+  if (parameter === null) return null;
+  const terms = parsed.searchParams.get(parameter);
+  return terms === null || terms.trim() === '' ? null : terms;
 }
 
 /** What the address bar shows for a given page URL: readable, not raw. */

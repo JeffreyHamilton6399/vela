@@ -19,6 +19,7 @@ import {
   updateStateSchema,
   downloadItemSchema,
   historyEntrySchema,
+  assistantReplySchema,
   windowStateSchema,
   type PrivacyReport,
   type SettingsImportResult,
@@ -26,6 +27,8 @@ import {
   type UpdateState,
   type DownloadItem,
   type HistoryEntry,
+  type AssistantMessage,
+  type AssistantReply,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -214,6 +217,13 @@ const bridge: VelaBridge = {
       return () => {
         ipcRenderer.off(EVENT_CHANNELS.downloadsChanged, wrapped);
       };
+    },
+  },
+  assistant: {
+    async ask(messages: readonly AssistantMessage[]): Promise<AssistantReply> {
+      return assistantReplySchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.assistantAsk, { messages }),
+      );
     },
   },
   history: {

@@ -45,7 +45,13 @@ export function PrivacyPanel({ onClose }: PrivacyPanelProps): JSX.Element {
   }, [onClose]);
 
   return (
-    <div className="absolute inset-0 flex items-start justify-center overflow-auto bg-surface p-4">
+    <div
+      className="absolute inset-0 flex items-start justify-center overflow-auto bg-surface p-4"
+      onClick={(event) => {
+        // Clicking the empty surface around the card dismisses it.
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section className="w-full max-w-[560px] rounded-card border border-line bg-raised p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1">
@@ -58,9 +64,10 @@ export function PrivacyPanel({ onClose }: PrivacyPanelProps): JSX.Element {
             type="button"
             aria-label="Close privacy panel"
             onClick={onClose}
-            className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
+            className="focus-ring flex items-center gap-1 rounded-lg border border-line px-1 py-[3px] text-[12px] text-ink-muted hover:bg-hover hover:text-ink"
           >
-            <CloseIcon width={12} height={12} />
+            <CloseIcon width={10} height={10} />
+            Close
           </button>
         </div>
 

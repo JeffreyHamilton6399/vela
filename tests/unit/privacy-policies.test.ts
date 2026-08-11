@@ -124,6 +124,15 @@ describe('categorizeRequest', () => {
     expect(categorizeRequest({ url: UPDATE_FEED_URL, fromWebContents: false })).toBe('update');
   });
 
+  it('recognises the assistant, which only runs on a key the user supplied', () => {
+    expect(
+      categorizeRequest({
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        fromWebContents: false,
+      }),
+    ).toBe('assistant');
+  });
+
   it('flags anything else as a bug', () => {
     expect(
       categorizeRequest({ url: 'https://analytics.example/collect', fromWebContents: false }),

@@ -42,6 +42,7 @@ test('the preload bridge is the only surface exposed', async () => {
   const keys = await page.evaluate(() => Object.keys(Reflect.get(globalThis, 'vela') as object));
   expect(keys.sort()).toEqual([
     'app',
+    'assistant',
     'bookmarks',
     'downloads',
     'history',

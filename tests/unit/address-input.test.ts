@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { displayUrl, originLabel, resolveAddressInput } from '../../src/shared/address-input.js';
+import {
+  describeAddress,
+  displayUrl,
+  originLabel,
+  resolveAddressInput,
+  searchTermsFor,
+} from '../../src/shared/address-input.js';
 import { DEFAULT_SEARCH_ENGINE_ID, findSearchEngine } from '../../src/shared/search-engines.js';
 
 const DDG = DEFAULT_SEARCH_ENGINE_ID;
@@ -90,5 +96,39 @@ describe('originLabel', () => {
   it('has no opinion about non-web schemes', () => {
     expect(originLabel('about:blank')).toBeNull();
     expect(originLabel('nonsense')).toBeNull();
+  });
+});
+
+describe('describeAddress', () => {
+  it('shows the terms you searched for, not the raw query string', () => {
+    expect(describeAddress('https://www.bing.com/search?q=how+to+center+a+div&form=QBLH')).toEqual({
+      kind: 'search',
+      text: 'how to center a div',
+    });
+  });
+
+  it('works for every engine Vela offers', () => {
+    const cases = [
+      'https://duckduckgo.com/?q=privacy',
+      'https://www.google.com/search?q=privacy',
+      'https://search.brave.com/search?q=privacy',
+      'https://www.ecosia.org/search?q=privacy',
+      'https://www.startpage.com/sp/search?query=privacy',
+    ];
+    for (const url of cases) {
+      expect(describeAddress(url), url).toEqual({ kind: 'search', text: 'privacy' });
+    }
+  });
+
+  it('leaves an ordinary page alone', () => {
+    expect(describeAddress('https://example.com/docs')).toEqual({
+      kind: 'url',
+      text: 'example.com/docs',
+    });
+  });
+
+  it('does not mistake a non-results page on a search host for a search', () => {
+    expect(searchTermsFor('https://duckduckgo.com/about')).toBeNull();
+    expect(searchTermsFor('https://duckduckgo.com/?q=')).toBeNull();
   });
 });

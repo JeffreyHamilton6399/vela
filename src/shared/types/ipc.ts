@@ -38,6 +38,19 @@ export const updateStateSchema = z.object({
 });
 export type UpdateState = z.infer<typeof updateStateSchema>;
 
+export const assistantMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(20_000),
+});
+export type AssistantMessage = z.infer<typeof assistantMessageSchema>;
+
+export const assistantReplySchema = z.object({
+  ok: z.boolean(),
+  text: z.string(),
+  error: z.string().nullable(),
+});
+export type AssistantReply = z.infer<typeof assistantReplySchema>;
+
 export const settingsImportResultSchema = z.object({
   ok: z.boolean(),
   message: z.string(),
@@ -179,6 +192,7 @@ export const INVOKE_CHANNELS = {
   downloadsGet: 'downloads:get',
   historySearch: 'history:search',
   historyClear: 'history:clear',
+  assistantAsk: 'assistant:ask',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -263,6 +277,10 @@ export const invokeContract = {
     response: z.array(historyEntrySchema),
   },
   [INVOKE_CHANNELS.historyClear]: { request: emptySchema, response: z.boolean() },
+  [INVOKE_CHANNELS.assistantAsk]: {
+    request: z.object({ messages: z.array(assistantMessageSchema).max(40) }),
+    response: assistantReplySchema,
+  },
   [INVOKE_CHANNELS.updatesGetState]: { request: emptySchema, response: updateStateSchema },
   [INVOKE_CHANNELS.privacyGetReport]: { request: emptySchema, response: privacyReportSchema },
   [INVOKE_CHANNELS.privacyClearData]: { request: emptySchema, response: z.boolean() },
@@ -410,6 +428,10 @@ export interface VelaBridge {
     cancel(id: string): void;
     clear(): void;
     onChanged(listener: (items: DownloadItem[]) => void): () => void;
+  };
+  readonly assistant: {
+    /** Uses the key in the local settings file; there is no shipped key. */
+    ask(messages: readonly AssistantMessage[]): Promise<AssistantReply>;
   };
   readonly history: {
     search(query: string, limit?: number): Promise<HistoryEntry[]>;

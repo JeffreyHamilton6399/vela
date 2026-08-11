@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, useState, type JSX, type RefObject } from 'react';
-import { displayUrl, originLabel, resolveAddressInput } from '../../shared/address-input.js';
+import { describeAddress, originLabel, resolveAddressInput } from '../../shared/address-input.js';
 import type { TabSnapshot } from '../../shared/types/ipc.js';
 import { LockIcon, SearchIcon, StarIcon, WarningIcon } from './icons.js';
 
@@ -61,10 +61,12 @@ export function AddressBar({
 
   const url = tab?.url ?? '';
 
+  const shown = describeAddress(url);
+
   // While the user is typing, their text wins over anything the page reports.
   useEffect(() => {
-    if (!editing) setValue(displayUrl(url));
-  }, [url, editing]);
+    if (!editing) setValue(shown.text);
+  }, [shown.text, editing]);
 
   useImperativeHandle(handleRef, () => ({
     focus: () => {
@@ -104,7 +106,7 @@ export function AddressBar({
         spellCheck={false}
         autoComplete="off"
         aria-label="Address and search"
-        placeholder="Search DuckDuckGo or enter an address"
+        placeholder="Search or enter an address"
         className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-muted"
         onChange={(event) => {
           setValue(event.target.value);
@@ -118,13 +120,13 @@ export function AddressBar({
         }}
         onBlur={() => {
           setEditing(false);
-          setValue(displayUrl(url));
+          setValue(describeAddress(url).text);
         }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault();
             setEditing(false);
-            setValue(displayUrl(url));
+            setValue(describeAddress(url).text);
             inputRef.current?.blur();
           }
         }}

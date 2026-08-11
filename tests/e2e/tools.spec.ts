@@ -74,7 +74,7 @@ test('the calculator evaluates without executing its input', async () => {
 });
 
 test('the unit converter works offline', async () => {
-  await chrome.getByRole('button', { name: 'Units' }).click();
+  await chrome.getByRole('button', { name: 'Unit converter' }).click();
 
   await chrome.getByLabel('Category').selectOption('temperature');
   await chrome.getByLabel('Amount').fill('100');
@@ -86,7 +86,7 @@ test('the unit converter works offline', async () => {
 
 test('notes survive a round trip through the local settings file', async () => {
   await chrome.getByRole('button', { name: 'Notes' }).click();
-  await chrome.getByLabel('Notes').fill('remember the milk');
+  await chrome.getByRole('textbox', { name: 'Notes' }).fill('remember the milk');
 
   await expect
     .poll(
