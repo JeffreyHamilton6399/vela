@@ -31,6 +31,13 @@ export const privacyReportSchema = z.object({
 });
 export type PrivacyReport = z.infer<typeof privacyReportSchema>;
 
+export const updateStateSchema = z.object({
+  status: z.enum(['idle', 'checking', 'current', 'available', 'downloading', 'ready', 'error']),
+  version: z.string().nullable(),
+  message: z.string().nullable(),
+});
+export type UpdateState = z.infer<typeof updateStateSchema>;
+
 export const settingsImportResultSchema = z.object({
   ok: z.boolean(),
   message: z.string(),
@@ -146,6 +153,7 @@ export const INVOKE_CHANNELS = {
   settingsGet: 'settings:get',
   settingsExport: 'settings:export',
   settingsImport: 'settings:import',
+  updatesGetState: 'updates:get-state',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -178,6 +186,9 @@ export const SEND_CHANNELS = {
   workspacesDelete: 'workspaces:delete',
   workspacesActivate: 'workspaces:activate',
   tabsSetWorkspace: 'tabs:set-workspace',
+  updatesCheck: 'updates:check',
+  updatesDownload: 'updates:download',
+  updatesInstall: 'updates:install',
   toolsSetNotes: 'tools:set-notes',
   speedDialAdd: 'speeddial:add',
   speedDialRemove: 'speeddial:remove',
@@ -191,6 +202,7 @@ export const EVENT_CHANNELS = {
   windowStateChanged: 'window:state-changed',
   browserStateChanged: 'browser:state-changed',
   settingsChanged: 'settings:changed',
+  updateStateChanged: 'updates:state-changed',
 } as const;
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNELS];
@@ -211,6 +223,7 @@ export const invokeContract = {
     request: z.object({ json: z.string().max(2_000_000) }),
     response: settingsImportResultSchema,
   },
+  [INVOKE_CHANNELS.updatesGetState]: { request: emptySchema, response: updateStateSchema },
   [INVOKE_CHANNELS.privacyGetReport]: { request: emptySchema, response: privacyReportSchema },
   [INVOKE_CHANNELS.privacyClearData]: { request: emptySchema, response: z.boolean() },
 } as const satisfies Record<InvokeChannel, { request: z.ZodType; response: z.ZodType }>;
@@ -242,6 +255,9 @@ export const sendContract = {
   [SEND_CHANNELS.workspacesDelete]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.workspacesActivate]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.tabsSetWorkspace]: z.object({ id: tabIdString, workspaceId: tabIdString }),
+  [SEND_CHANNELS.updatesCheck]: emptySchema,
+  [SEND_CHANNELS.updatesDownload]: emptySchema,
+  [SEND_CHANNELS.updatesInstall]: emptySchema,
   [SEND_CHANNELS.toolsSetNotes]: z.object({ text: z.string().max(500_000) }),
   [SEND_CHANNELS.speedDialAdd]: speedDialAddSchema,
   [SEND_CHANNELS.speedDialRemove]: z.object({ id: tabIdString }),
@@ -254,6 +270,7 @@ export const eventContract = {
   [EVENT_CHANNELS.windowStateChanged]: windowStateSchema,
   [EVENT_CHANNELS.browserStateChanged]: browserStateSchema,
   [EVENT_CHANNELS.settingsChanged]: settingsSchema,
+  [EVENT_CHANNELS.updateStateChanged]: updateStateSchema,
 } as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.infer<(typeof invokeContract)[C]['request']>;
@@ -336,6 +353,14 @@ export interface VelaBridge {
     activate(id: string): void;
     /** Moves a tab into another workspace, suspending it on the way out. */
     moveTab(id: string, workspaceId: string): void;
+  };
+  readonly updates: {
+    getState(): Promise<UpdateState>;
+    check(): void;
+    /** Downloads only when the user asks; nothing is fetched automatically. */
+    download(): void;
+    install(): void;
+    onChanged(listener: (state: UpdateState) => void): () => void;
   };
   readonly tools: {
     /** Sidebar notes. Local file, never synced anywhere. */

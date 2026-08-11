@@ -4,6 +4,7 @@ import {
   SEND_CHANNELS,
   type PrivacyReport,
   type SettingsImportResult,
+  type UpdateState,
 } from '../../shared/types/ipc.js';
 import type { SettingsStore } from '../settings/store.js';
 import { addTile, moveTile, normalizeUrl, removeTile } from '../speed-dial.js';
@@ -13,6 +14,12 @@ export interface SettingsIpcDeps extends GuardOptions {
   getStore: () => SettingsStore | null;
   getReport: (sender: unknown) => PrivacyReport;
   clearData: (sender: unknown) => Promise<boolean>;
+  updater: {
+    current: UpdateState;
+    check: () => void;
+    download: () => void;
+    install: () => void;
+  };
   /** Icon already on this machine for a URL, or null. Never fetches. */
   cachedFavicon: (url: string) => string | null;
 }
@@ -56,6 +63,20 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
 
   handleSend(deps, SEND_CHANNELS.settingsSet, (patch) => {
     deps.getStore()?.update(patch);
+  });
+
+  handleInvoke(deps, INVOKE_CHANNELS.updatesGetState, () => deps.updater.current);
+
+  handleSend(deps, SEND_CHANNELS.updatesCheck, () => {
+    deps.updater.check();
+  });
+
+  handleSend(deps, SEND_CHANNELS.updatesDownload, () => {
+    deps.updater.download();
+  });
+
+  handleSend(deps, SEND_CHANNELS.updatesInstall, () => {
+    deps.updater.install();
   });
 
   handleSend(deps, SEND_CHANNELS.toolsSetNotes, ({ text }) => {

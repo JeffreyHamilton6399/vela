@@ -12,6 +12,7 @@ import { SettingsPanel } from './components/SettingsPanel.js';
 import { Sidebar, type SidebarTool } from './components/Sidebar.js';
 import { TitleBar } from './components/TitleBar.js';
 import { Toolbar } from './components/Toolbar.js';
+import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
 import { SettingsIcon, SidebarIcon } from './components/icons.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
@@ -47,6 +48,7 @@ export function App(): JSX.Element {
   const tab = useActiveTab(browser);
   const settings = useSettings();
   const { maximized, focused } = useWindowState();
+  const update = useUpdateState();
   useThemePreference(settings.theme);
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -131,6 +133,8 @@ export function App(): JSX.Element {
           </>
         }
       />
+
+      <UpdateBanner state={update} />
 
       <div className="flex min-h-0 flex-1">
         {/* The page view is positioned over this element by the main process. */}

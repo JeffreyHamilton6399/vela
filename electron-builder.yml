@@ -1,0 +1,65 @@
+appId: com.vela.browser
+productName: Vela
+copyright: Vela contributors
+
+directories:
+  output: release
+  buildResources: build
+
+# Only what the app actually runs. Sources, tests and configs stay out.
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+
+extraResources:
+  # The ad/tracker engine compiled by scripts/fetch-filters.mjs. Shipping it
+  # is what lets Vela block without ever fetching a filter list at runtime.
+  - from: resources/adblock-engine.bin
+    to: adblock-engine.bin
+  - from: resources/adblock-engine.json
+    to: adblock-engine.json
+
+asar: true
+# Node's own compile cache; the app is faster on second launch for free.
+electronLanguages:
+  - en-US
+
+publish:
+  provider: github
+  owner: vela-browser
+  repo: vela
+  releaseType: release
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  artifactName: Vela-${version}-windows-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [universal]
+  category: public.app-category.productivity
+  artifactName: Vela-${version}-macos-${arch}.${ext}
+  # Unsigned for now: see the install notes in the README.
+  identity: null
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+  category: Network;WebBrowser
+  artifactName: Vela-${version}-linux-${arch}.${ext}
+  desktop:
+    entry:
+      Name: Vela
+      Comment: A privacy-focused web browser
+      Categories: Network;WebBrowser;

@@ -16,10 +16,12 @@ import {
   browserStateSchema,
   privacyReportSchema,
   settingsImportResultSchema,
+  updateStateSchema,
   windowStateSchema,
   type PrivacyReport,
   type SettingsImportResult,
   type SpeedDialAddPayload,
+  type UpdateState,
   type AppInfo,
   type BrowserState,
   type ContentInsetsPayload,
@@ -179,6 +181,30 @@ const bridge: VelaBridge = {
     },
     moveTab(id: string, workspaceId: string): void {
       ipcRenderer.send(SEND_CHANNELS.tabsSetWorkspace, { id, workspaceId });
+    },
+  },
+  updates: {
+    async getState(): Promise<UpdateState> {
+      return updateStateSchema.parse(await ipcRenderer.invoke(INVOKE_CHANNELS.updatesGetState));
+    },
+    check(): void {
+      ipcRenderer.send(SEND_CHANNELS.updatesCheck);
+    },
+    download(): void {
+      ipcRenderer.send(SEND_CHANNELS.updatesDownload);
+    },
+    install(): void {
+      ipcRenderer.send(SEND_CHANNELS.updatesInstall);
+    },
+    onChanged(listener: (state: UpdateState) => void): () => void {
+      const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
+        const parsed = updateStateSchema.safeParse(payload);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(EVENT_CHANNELS.updateStateChanged, wrapped);
+      return () => {
+        ipcRenderer.off(EVENT_CHANNELS.updateStateChanged, wrapped);
+      };
     },
   },
   tools: {

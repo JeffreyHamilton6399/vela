@@ -129,7 +129,7 @@ export class VelaWindow {
     return !this.window.isDestroyed() && sender === this.window.webContents;
   }
 
-  private send(channel: string, payload: unknown): void {
+  send(channel: string, payload: unknown): void {
     if (this.window.isDestroyed() || this.window.webContents.isDestroyed()) return;
     this.window.webContents.send(channel, payload);
   }

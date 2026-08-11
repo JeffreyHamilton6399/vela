@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { BrowserWindow, app, ipcMain, nativeTheme, session } from 'electron';
-import type { AppInfo } from '../shared/types/ipc.js';
+import { EVENT_CHANNELS, type AppInfo, type UpdateState } from '../shared/types/ipc.js';
 import { resolvePlatform } from '../shared/platform.js';
 import { registerWindowIpc } from './ipc/register-window-ipc.js';
 import { registerTabIpc } from './ipc/register-tab-ipc.js';
@@ -11,6 +11,7 @@ import { loadBlocker, type BlockerHandle } from './privacy/adblock.js';
 import { buildUserAgent, UPDATE_FEED_URL } from './privacy/policies.js';
 import { clearBrowsingData } from './privacy/session-hardening.js';
 import { SettingsStore } from './settings/store.js';
+import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
 import { SURFACE } from './window-options.js';
 import { VelaWindow } from './vela-window.js';
@@ -23,7 +24,12 @@ const APP_PATH = app.getAppPath();
 const OUT_DIR = path.join(APP_PATH, 'out');
 const PRELOAD_PATH = path.join(OUT_DIR, 'preload', 'index.cjs');
 const RENDERER_HTML = path.join(OUT_DIR, 'renderer', 'index.html');
-const RESOURCES_DIR = path.join(APP_PATH, 'resources');
+/**
+ * Where the shipped ad/tracker engine lives. In a packaged build `extraResources`
+ * land beside the asar, not inside it, so this is `process.resourcesPath` there
+ * and the repo's own `resources/` directory in development.
+ */
+const RESOURCES_DIR = app.isPackaged ? process.resourcesPath : path.join(APP_PATH, 'resources');
 const DEV_SERVER_URL = process.env['VELA_DEV_SERVER_URL'];
 
 const USER_AGENT = buildUserAgent(PLATFORM, process.versions.chrome.split('.')[0] ?? '140');
@@ -41,6 +47,7 @@ const windows = new Map<number, VelaWindow>();
 let settings: SettingsStore | null = null;
 let blocker: BlockerHandle | null = null;
 let favicons: FaviconCache | null = null;
+let updater: Updater | null = null;
 
 function getAppInfo(): AppInfo {
   return {
@@ -97,6 +104,13 @@ function createWindow(options: { isPrivate: boolean }): VelaWindow {
   return window;
 }
 
+/** Pushes update state to every open window. */
+function broadcastUpdateState(state: UpdateState): void {
+  for (const window of windows.values()) {
+    window.send(EVENT_CHANNELS.updateStateChanged, state);
+  }
+}
+
 function onIpcViolation(error: IpcContractError): void {
   console.error(error.message);
 }
@@ -119,6 +133,13 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(async () => {
     settings = new SettingsStore();
+    updater = new Updater({
+      isEnabled: () => settings?.current.checkForUpdates ?? false,
+      onStateChanged: (state) => {
+        broadcastUpdateState(state);
+      },
+    });
+
     favicons = new FaviconCache(app.getPath('userData'), true);
     await favicons.load();
     blocker = await loadBlocker(RESOURCES_DIR);
@@ -162,6 +183,14 @@ if (!app.requestSingleInstanceLock()) {
         };
       },
       cachedFavicon: (url) => favicons?.get(url) ?? null,
+      updater: {
+        get current(): UpdateState {
+          return updater?.current ?? { status: 'idle', version: null, message: null };
+        },
+        check: () => updater?.check(),
+        download: () => updater?.download(),
+        install: () => updater?.install(),
+      },
       clearData: async (sender) => {
         const owner = windowFor(sender);
         if (owner === null) return false;
@@ -177,6 +206,12 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     createWindow({ isPrivate: false });
+
+    // One check, a few seconds after start, so it never competes with the
+    // first paint. Nothing is downloaded unless the user asks.
+    setTimeout(() => {
+      updater?.check();
+    }, 5000).unref();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow({ isPrivate: false });

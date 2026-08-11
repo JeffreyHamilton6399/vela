@@ -21,11 +21,14 @@
     "test:e2e": "npm run build && playwright test",
     "verify": "npm run typecheck && npm run lint && npm run test",
     "prebuild": "node scripts/fetch-filters.mjs --if-missing",
-    "filters:update": "node scripts/fetch-filters.mjs"
+    "filters:update": "node scripts/fetch-filters.mjs",
+    "package": "npm run build && electron-builder --publish never",
+    "release": "npm run build && electron-builder --publish always"
   },
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.18.2",
     "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -37,6 +40,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
     "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.8.1",
     "eslint-plugin-security": "^4.0.1",
     "globals": "^17.9.0",
