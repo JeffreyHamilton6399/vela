@@ -5,7 +5,7 @@
  *   node scripts/screenshot.mjs out.png [url ...]
  *   node scripts/screenshot.mjs out.png --keys "Control+b" --wait 800
  */
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,9 +19,12 @@ if (outfile === undefined) {
 }
 
 const keys = [];
+const returning = args.includes('--returning');
 const urls = [];
 for (let i = 0; i < args.length; i += 1) {
-  if (args[i] === '--keys') {
+  if (args[i] === '--returning') {
+    continue;
+  } else if (args[i] === '--keys') {
     const value = args[i + 1];
     if (value !== undefined) keys.push(value);
     i += 1;
@@ -35,10 +38,18 @@ const targets = urls.map((url) =>
   /^[a-z]+:/i.test(url) ? url : pathToFileURL(path.resolve(root, url)).href,
 );
 
+// A throwaway profile, so screenshots never touch real settings.
+const profile = mkdtempSync(path.join(tmpdir(), 'vela-shot-'));
+if (returning) {
+  writeFileSync(
+    path.join(profile, 'vela-settings.json'),
+    JSON.stringify({ settings: { onboardingComplete: true } }),
+  );
+}
+
 const app = await electron.launch({
   args: [root],
-  // A throwaway profile, so screenshots never touch real settings.
-  env: { ...process.env, VELA_USER_DATA_DIR: mkdtempSync(path.join(tmpdir(), 'vela-shot-')) },
+  env: { ...process.env, VELA_USER_DATA_DIR: profile },
 });
 const page = await app.firstWindow();
 await page.waitForSelector('[role="tablist"]');

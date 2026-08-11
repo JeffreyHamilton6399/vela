@@ -27,6 +27,19 @@ There is no third. In development, a `session.webRequest` assertion logs any req
 
 Everything Vela remembers lives in one local JSON file. The settings panel prints its path, and the export button hands you its contents verbatim.
 
+## What it does
+
+- **First-run screen** that asks where your searches should go — DuckDuckGo, Startpage, Brave, Ecosia, Google or Bing — and says plainly which of them build a profile from them.
+- **Tabs** with drag reordering, pinning, restore-last-closed, and native context menus.
+- **Workspaces**: named tab groups. Leaving one suspends its tabs, so an idle workspace costs storage for its titles and nothing else.
+- **Speed Dial** new tab page with locally cached favicons.
+- **Bookmarks** with a bar, **local history** that feeds the command palette, and a **downloads** list.
+- **Per-site zoom** that sticks ( / / ).
+- **Command palette** (), **sidebar tools** (: notes, calculator, unit converter), and **bang shortcuts** (, , ) resolved on this machine.
+- **Private windows** () on a memory-only session.
+
+Not yet: find in page. It is written but Chromium's event does not reach a listener registered from the app's own main bundle in this configuration, so it was removed rather than shipped as a search box that never counts matches.
+
 ## Commands
 
 | Command                  | What it does                                                        |
