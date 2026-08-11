@@ -23,7 +23,7 @@ Out of the box Vela makes exactly **two** kinds of network request:
 1. the pages you navigate to, and
 2. one check of the GitHub Releases feed — a plain GET, no query parameters, no install identifier, and a user agent that is the version string and nothing else.
 
-A **third** appears only if you choose it: the sidebar assistant, once you paste in your own API key. It is inert until then, and sends only what you type into that panel. In development, a `session.webRequest` assertion logs any request that is none of these, so accidental telemetry surfaces while building rather than after shipping.
+A **third** appears only if you go out of your way: switching the assistant from its local default to a hosted service. Left alone it talks to a model on your own machine, which is not the internet at all. In development, a `session.webRequest` assertion logs any request that is none of these, so accidental telemetry surfaces while building rather than after shipping.
 
 Everything Vela remembers lives in one local JSON file. The settings panel prints its path, and the export button hands you its contents verbatim.
 
