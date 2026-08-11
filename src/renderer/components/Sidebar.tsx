@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { calculate, formatNumber } from '../../shared/tools/calculator.js';
-import { convert, findCategory, UNIT_CATEGORIES } from '../../shared/tools/units.js';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import type { WebPanel } from '../../shared/settings.js';
 import { Assistant } from './Assistant.js';
 import { CloseIcon } from './icons.js';
 
-export type SidebarTool = 'assistant' | 'notes' | 'calculator' | 'units' | 'panels';
+export type SidebarTool = 'assistant' | 'notes' | 'panels';
 
 interface SidebarProps {
   tool: SidebarTool;
@@ -20,8 +18,6 @@ interface SidebarProps {
 const TOOLS: { id: SidebarTool; label: string }[] = [
   { id: 'assistant', label: 'Assistant' },
   { id: 'notes', label: 'Notes' },
-  { id: 'calculator', label: 'Calculator' },
-  { id: 'units', label: 'Unit converter' },
   { id: 'panels', label: 'Sidebar sites' },
 ];
 
@@ -133,124 +129,6 @@ function Notes({ notes }: { notes: string }): JSX.Element {
   );
 }
 
-function Calculator(): JSX.Element {
-  const [input, setInput] = useState('');
-  const result = useMemo(() => calculate(input), [input]);
-
-  return (
-    <div className="flex flex-col gap-1">
-      <input
-        value={input}
-        onChange={(event) => {
-          setInput(event.target.value);
-        }}
-        aria-label="Expression"
-        placeholder="12 * (3 + 4)"
-        spellCheck={false}
-        className={FIELD}
-      />
-
-      <output
-        className={`min-h-6 rounded-lg px-1 py-1 text-right text-[18px] tabular-nums ${
-          result.ok ? 'text-ink' : 'text-ink-muted'
-        }`}
-      >
-        {result.ok ? formatNumber(result.value) : result.error}
-      </output>
-
-      <p className="text-[11px] text-ink-muted">
-        Evaluated by a parser, not by running your input as code.
-      </p>
-    </div>
-  );
-}
-
-function Units(): JSX.Element {
-  const [categoryId, setCategoryId] = useState('length');
-  const category = findCategory(categoryId);
-  const [amount, setAmount] = useState('1');
-  const [fromId, setFromId] = useState(category.units[0]?.id ?? '');
-  const [toId, setToId] = useState(category.units[1]?.id ?? '');
-
-  useEffect(() => {
-    setFromId(category.units[0]?.id ?? '');
-    setToId(category.units[1]?.id ?? '');
-  }, [category]);
-
-  const value = Number.parseFloat(amount);
-  const converted = Number.isNaN(value) ? null : convert(value, categoryId, fromId, toId);
-
-  return (
-    <div className="flex flex-col gap-1">
-      <select
-        value={categoryId}
-        onChange={(event) => {
-          setCategoryId(event.target.value);
-        }}
-        aria-label="Category"
-        className={FIELD}
-      >
-        {UNIT_CATEGORIES.map((entry) => (
-          <option key={entry.id} value={entry.id}>
-            {entry.name}
-          </option>
-        ))}
-      </select>
-
-      <input
-        value={amount}
-        onChange={(event) => {
-          setAmount(event.target.value);
-        }}
-        aria-label="Amount"
-        inputMode="decimal"
-        className={FIELD}
-      />
-
-      <div className="flex items-center gap-1">
-        <select
-          value={fromId}
-          onChange={(event) => {
-            setFromId(event.target.value);
-          }}
-          aria-label="From unit"
-          className={FIELD}
-        >
-          {category.units.map((unit) => (
-            <option key={unit.id} value={unit.id}>
-              {unit.name}
-            </option>
-          ))}
-        </select>
-        <span className="text-[12px] text-ink-muted">to</span>
-        <select
-          value={toId}
-          onChange={(event) => {
-            setToId(event.target.value);
-          }}
-          aria-label="To unit"
-          className={FIELD}
-        >
-          {category.units.map((unit) => (
-            <option key={unit.id} value={unit.id}>
-              {unit.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <output className="min-h-6 px-1 py-1 text-right text-[18px] tabular-nums text-ink">
-        {converted === null ? '—' : formatNumber(converted)}
-      </output>
-
-      <p className="text-[11px] text-ink-muted">
-        Every factor ships with the app. No currency: a live rate would mean a request Vela does not
-        make.
-      </p>
-    </div>
-  );
-}
-
 /**
  * The sidebar panel. It sits beside the page rather than over it, so the
  * content insets shrink and the `WebContentsView` is repositioned to match.
@@ -287,8 +165,6 @@ export function Sidebar({
       <div className="min-h-0 flex-1">
         {tool === 'assistant' ? <Assistant onOpenSettings={onOpenSettings} /> : null}
         {tool === 'notes' ? <Notes notes={notes} /> : null}
-        {tool === 'calculator' ? <Calculator /> : null}
-        {tool === 'units' ? <Units /> : null}
         {tool === 'panels' ? (
           <Panels panels={panels} autoFocus={addingPanel} onDone={onAddPanelDone} />
         ) : null}

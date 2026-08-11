@@ -12,7 +12,12 @@ import type { SettingsStore } from '../settings/store.js';
 import { addTile, moveTile, normalizeUrl, removeTile } from '../speed-dial.js';
 import { randomUUID } from 'node:crypto';
 import { addBookmark, moveBookmark, removeBookmark } from '../../shared/bookmarks.js';
-import { askAssistant, assistantStatus, type AssistantConfig } from '../assistant/assistant.js';
+import {
+  askAssistant,
+  assistantStatus,
+  pullOllamaModel,
+  type AssistantConfig,
+} from '../assistant/assistant.js';
 import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js';
 
 export interface SettingsIpcDeps extends GuardOptions {
@@ -83,6 +88,8 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
   handleInvoke(deps, INVOKE_CHANNELS.assistantAsk, async ({ messages }) =>
     askAssistant(assistantConfig(deps), messages),
   );
+
+  handleInvoke(deps, INVOKE_CHANNELS.assistantPull, async ({ model }) => pullOllamaModel(model));
 
   handleInvoke(deps, INVOKE_CHANNELS.assistantStatus, async () =>
     assistantStatus(assistantConfig(deps)),

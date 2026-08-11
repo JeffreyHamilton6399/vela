@@ -62,31 +62,13 @@ test('the sidebar opens on Ctrl+B and shrinks the page region', async () => {
   await expect.poll(insets).toBeLessThan(before);
 });
 
-test('the calculator evaluates without executing its input', async () => {
-  await chrome.getByRole('button', { name: 'Calculator' }).click();
-
-  const expression = chrome.getByLabel('Expression');
-  await expression.fill('2 + 3 * 4');
-  await expect(chrome.locator('output').first()).toHaveText('14');
-
-  await expression.fill('globalThis');
-  await expect(chrome.locator('output').first()).not.toHaveText('14');
-});
-
-test('the unit converter works offline', async () => {
-  await chrome.getByRole('button', { name: 'Unit converter' }).click();
-
-  await chrome.getByLabel('Category').selectOption('temperature');
-  await chrome.getByLabel('Amount').fill('100');
-  await chrome.getByLabel('From unit').selectOption('c');
-  await chrome.getByLabel('To unit').selectOption('f');
-
-  await expect(chrome.locator('output').first()).toHaveText('212');
-});
-
 test('notes survive a round trip through the local settings file', async () => {
-  await chrome.getByRole('button', { name: 'Notes' }).click();
-  await chrome.getByRole('textbox', { name: 'Notes' }).fill('remember the milk');
+  // The rail toggles, so only click when notes are not already showing.
+  const notes = chrome.getByRole('textbox', { name: 'Notes' });
+  if (!(await notes.isVisible())) {
+    await chrome.getByRole('button', { name: 'Notes' }).click();
+  }
+  await notes.fill('remember the milk');
 
   await expect
     .poll(

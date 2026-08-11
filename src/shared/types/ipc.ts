@@ -202,6 +202,7 @@ export const INVOKE_CHANNELS = {
   historyClear: 'history:clear',
   assistantAsk: 'assistant:ask',
   assistantStatus: 'assistant:status',
+  assistantPull: 'assistant:pull',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -292,6 +293,10 @@ export const invokeContract = {
   },
   [INVOKE_CHANNELS.historyClear]: { request: emptySchema, response: z.boolean() },
   [INVOKE_CHANNELS.assistantStatus]: { request: emptySchema, response: assistantStatusSchema },
+  [INVOKE_CHANNELS.assistantPull]: {
+    request: z.object({ model: z.string().min(1).max(120) }),
+    response: z.object({ ok: z.boolean(), error: z.string().nullable() }),
+  },
   [INVOKE_CHANNELS.assistantAsk]: {
     request: z.object({ messages: z.array(assistantMessageSchema).max(40) }),
     response: assistantReplySchema,
@@ -461,6 +466,8 @@ export interface VelaBridge {
     ask(messages: readonly AssistantMessage[]): Promise<AssistantReply>;
     /** Whether the chosen provider is reachable, and what it can run. */
     status(): Promise<AssistantStatus>;
+    /** Downloads a model through the local Ollama install. */
+    pull(model: string): Promise<{ ok: boolean; error: string | null }>;
   };
   readonly history: {
     search(query: string, limit?: number): Promise<HistoryEntry[]>;

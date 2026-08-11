@@ -3,7 +3,6 @@ import type { WorkspaceSummary } from '../../shared/types/ipc.js';
 import type { WebPanel } from '../../shared/settings.js';
 import type { SidebarTool } from './Sidebar.js';
 import {
-  CalculatorIcon,
   CloseIcon,
   GlobeIcon,
   NotesIcon,
@@ -11,7 +10,6 @@ import {
   SettingsIcon,
   ShieldIcon,
   SparkIcon,
-  UnitsIcon,
 } from './icons.js';
 
 interface WorkspaceRailProps {
@@ -35,8 +33,22 @@ function initial(name: string): string {
 const TOOLS: { id: SidebarTool; label: string; glyph: JSX.Element }[] = [
   { id: 'assistant', label: 'Assistant', glyph: <SparkIcon width={15} height={15} /> },
   { id: 'notes', label: 'Notes', glyph: <NotesIcon width={15} height={15} /> },
-  { id: 'calculator', label: 'Calculator', glyph: <CalculatorIcon width={15} height={15} /> },
-  { id: 'units', label: 'Unit converter', glyph: <UnitsIcon width={15} height={15} /> },
+];
+
+/**
+ * Sites people usually want in a sidebar. Picking one adds it as a web panel;
+ * they are suggestions, not bundled integrations — each is just a URL.
+ */
+const SUGGESTED_SITES: readonly { title: string; url: string }[] = [
+  { title: 'WhatsApp', url: 'https://web.whatsapp.com' },
+  { title: 'Messenger', url: 'https://www.messenger.com' },
+  { title: 'Telegram', url: 'https://web.telegram.org' },
+  { title: 'Slack', url: 'https://app.slack.com/client' },
+  { title: 'Discord', url: 'https://discord.com/app' },
+  { title: 'Gmail', url: 'https://mail.google.com' },
+  { title: 'Calendar', url: 'https://calendar.google.com' },
+  { title: 'ChatGPT', url: 'https://chat.openai.com' },
+  { title: 'YouTube Music', url: 'https://music.youtube.com' },
 ];
 
 /**
@@ -60,12 +72,28 @@ export function WorkspaceRail({
   onOpenPrivacy,
 }: WorkspaceRailProps): JSX.Element {
   const [creating, setCreating] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
   }, [creating]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismiss = (): void => {
+      setMenuOpen(false);
+    };
+    // Deferred, so the click that opened the menu does not immediately close it.
+    const timer = setTimeout(() => {
+      window.addEventListener('click', dismiss);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('click', dismiss);
+    };
+  }, [menuOpen]);
 
   return (
     <nav
@@ -216,15 +244,57 @@ export function WorkspaceRail({
         </div>
       ))}
 
-      <button
-        type="button"
-        aria-label="Add a site to the sidebar"
-        title="Add a site to the sidebar"
-        onClick={onAddPanel}
-        className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
-      >
-        <GlobeIcon width={14} height={14} />
-      </button>
+      <div className="relative">
+        <button
+          type="button"
+          aria-label="Add a site to the sidebar"
+          aria-expanded={menuOpen}
+          title="Add a site to the sidebar"
+          onClick={() => {
+            setMenuOpen((open) => !open);
+          }}
+          className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
+        >
+          <GlobeIcon width={14} height={14} />
+        </button>
+
+        {menuOpen ? (
+          <div
+            role="menu"
+            aria-label="Add a site"
+            className="absolute bottom-0 left-5 z-20 w-[210px] overflow-hidden rounded-card border border-line bg-raised py-1 shadow-sm"
+          >
+            {SUGGESTED_SITES.filter(
+              (site) => !panels.some((panel) => panel.url.startsWith(site.url)),
+            ).map((site) => (
+              <button
+                key={site.url}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  window.vela.panels.add(site.url, site.title);
+                  setMenuOpen(false);
+                }}
+                className="flex w-full items-center px-2 py-1 text-left text-[13px] text-ink transition-colors duration-100 hover:bg-hover"
+              >
+                {site.title}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                onAddPanel();
+              }}
+              className="mt-1 flex w-full items-center border-t border-line px-2 py-1 text-left text-[13px] text-ink-muted transition-colors duration-100 hover:bg-hover hover:text-ink"
+            >
+              Any other site…
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       <span className="flex-1" />
 

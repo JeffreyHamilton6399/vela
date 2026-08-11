@@ -30,6 +30,7 @@ test.afterAll(async () => {
 
 test('a site can be docked into the sidebar from the rail', async () => {
   await chrome.getByRole('button', { name: 'Add a site to the sidebar' }).click();
+  await chrome.getByRole('menuitem', { name: 'Any other site…' }).click();
 
   const field = chrome.getByLabel('Site address');
   await expect(field).toBeVisible();
@@ -83,6 +84,27 @@ test('the panel view is positioned inside the sidebar, not over the page', async
   // Same column as the sidebar, within a pixel of rounding.
   expect(Math.abs(panelBounds.x - sidebarBox.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(panelBounds.width - sidebarBox.width)).toBeLessThanOrEqual(2);
+});
+
+test('a suggested site can be added straight from the menu', async () => {
+  await chrome.getByRole('button', { name: 'Add a site to the sidebar' }).click();
+
+  const suggestion = chrome.getByRole('menuitem', { name: 'Telegram' });
+  await expect(suggestion).toBeVisible();
+  await suggestion.click();
+
+  await expect
+    .poll(async () => (await settings()).webPanels.some((panel) => panel.title === 'Telegram'))
+    .toBe(true);
+
+  // Removed again, so the next test sees a single panel.
+  const added = (await settings()).webPanels.find((panel) => panel.title === 'Telegram');
+  await chrome.evaluate((id) => {
+    (
+      globalThis as unknown as { vela: { panels: { remove: (id: string) => void } } }
+    ).vela.panels.remove(id);
+  }, added?.id ?? '');
+  await expect.poll(async () => (await settings()).webPanels.length).toBe(1);
 });
 
 test('removing a panel takes it off the rail', async () => {

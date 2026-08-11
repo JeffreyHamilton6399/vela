@@ -16,6 +16,19 @@ export const OLLAMA_ORIGIN = 'http://127.0.0.1:11434';
 export const HOSTED_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
 export const DEFAULT_OLLAMA_MODEL = 'llama3.2';
+
+/**
+ * Models worth offering to someone who has just installed Ollama. Sizes are
+ * the download, which is the number that actually decides whether a person
+ * wants it.
+ */
+export const SUGGESTED_MODELS: readonly { name: string; size: string; note: string }[] = [
+  { name: 'llama3.2', size: '2.0 GB', note: 'Good default. Fast on most machines.' },
+  { name: 'llama3.2:1b', size: '1.3 GB', note: 'Smallest. Works on modest hardware.' },
+  { name: 'qwen2.5:7b', size: '4.7 GB', note: 'Stronger reasoning, slower.' },
+  { name: 'gemma2:2b', size: '1.6 GB', note: 'Small and quick.' },
+  { name: 'phi3.5', size: '2.2 GB', note: 'Compact, good at code.' },
+];
 export const DEFAULT_HOSTED_MODEL = 'llama-3.3-70b-versatile';
 
 const SYSTEM_PROMPT =
@@ -64,6 +77,31 @@ export async function probeOllama(): Promise<{ running: boolean; models: string[
     return { running: false, models: [] };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Downloads a model through Ollama. Returns when the pull finishes, which for
+ * a multi-gigabyte model is a while — the caller shows it as pending.
+ */
+export async function pullOllamaModel(
+  name: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const response = await fetch(`${OLLAMA_ORIGIN}/api/pull`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: name, stream: false }),
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: `Ollama returned ${String(response.status)} pulling ${name}.` };
+    }
+
+    await response.json();
+    return { ok: true, error: null };
+  } catch {
+    return { ok: false, error: 'Could not reach Ollama on this machine.' };
   }
 }
 
