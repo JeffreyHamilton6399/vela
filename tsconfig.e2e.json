@@ -1,0 +1,9 @@
+{
+  "//": "Playwright specs run Node code, but their page.evaluate callbacks run in the page and touch DOM globals.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["tests/e2e/**/*.ts", "playwright.config.ts"]
+}

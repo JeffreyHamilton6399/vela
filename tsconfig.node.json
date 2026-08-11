@@ -8,7 +8,8 @@
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "src/shared/**/*.ts",
-    "tests/**/*.ts",
+    "tests/unit/**/*.ts",
     "*.config.ts"
-  ]
+  ],
+  "exclude": ["tests/e2e/**/*.ts"]
 }
