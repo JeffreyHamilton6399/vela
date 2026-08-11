@@ -34,11 +34,11 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 - **Workspaces**: named tab groups. Leaving one suspends its tabs, so an idle workspace costs storage for its titles and nothing else.
 - **Speed Dial** new tab page with locally cached favicons.
 - **Bookmarks** with a bar, **local history** that feeds the command palette, and a **downloads** list.
-- **Per-site zoom** that sticks ( / / ).
-- **Command palette** (), **sidebar tools** (: notes, calculator, unit converter), and **bang shortcuts** (, , ) resolved on this machine.
-- **Private windows** () on a memory-only session.
+- **Per-site zoom** that sticks (`Ctrl+=` / `Ctrl+-` / `Ctrl+0`).
+- **Command palette** (`Ctrl+K`), **sidebar tools** (`Ctrl+B` — notes, calculator, unit converter), and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
+- **Private windows** (`Ctrl+Shift+N`) on a memory-only session.
 
-Not yet: find in page. It is written but Chromium's event does not reach a listener registered from the app's own main bundle in this configuration, so it was removed rather than shipped as a search box that never counts matches.
+Not yet: find in page. It is written, but Chromium's `found-in-page` event does not reach a listener registered from the app's own main bundle in this configuration, so it was removed rather than shipped as a search box that never counts matches.
 
 ## Commands
 
