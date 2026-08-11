@@ -111,6 +111,9 @@ export const SEND_CHANNELS = {
   tabsReload: 'tabs:reload',
   tabsStop: 'tabs:stop',
   tabsShowNewTab: 'tabs:show-newtab',
+  tabsCloseOthers: 'tabs:close-others',
+  tabsDuplicate: 'tabs:duplicate',
+  menuTab: 'menu:tab',
   layoutSetInsets: 'layout:set-insets',
   layoutSetOverlay: 'layout:set-overlay',
 } as const;
@@ -151,6 +154,9 @@ export const sendContract = {
   [SEND_CHANNELS.tabsReload]: tabReloadSchema,
   [SEND_CHANNELS.tabsStop]: tabRefSchema,
   [SEND_CHANNELS.tabsShowNewTab]: tabRefSchema,
+  [SEND_CHANNELS.tabsCloseOthers]: tabRefSchema,
+  [SEND_CHANNELS.tabsDuplicate]: tabRefSchema,
+  [SEND_CHANNELS.menuTab]: tabRefSchema,
   [SEND_CHANNELS.layoutSetInsets]: contentInsetsSchema,
   [SEND_CHANNELS.layoutSetOverlay]: z.object({ open: z.boolean() }),
 } as const satisfies Record<SendChannel, z.ZodType>;
@@ -209,6 +215,10 @@ export interface VelaBridge {
     reload(id: string, ignoreCache?: boolean): void;
     stop(id: string): void;
     showNewTabPage(id: string): void;
+    closeOthers(id: string): void;
+    duplicate(id: string): void;
+    /** Opens the native tab context menu at the cursor. */
+    openContextMenu(id: string): void;
     onStateChanged(listener: (state: BrowserState) => void): () => void;
   };
   readonly layout: {

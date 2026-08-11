@@ -6,6 +6,7 @@ import { DEFAULT_SEARCH_ENGINE_ID } from '../shared/search-engines.js';
 import { createWindowOptions, SURFACE } from './window-options.js';
 import { registerWindowIpc, readWindowState } from './ipc/register-window-ipc.js';
 import { registerTabIpc } from './ipc/register-tab-ipc.js';
+import { popupTabMenu } from './menus/tab-menu.js';
 import { TabManager } from './tabs/tab-manager.js';
 import type { IpcContractError } from './ipc/contract-guard.js';
 
@@ -159,7 +160,13 @@ if (!app.requestSingleInstanceLock()) {
     };
 
     registerWindowIpc({ ...guard, getWindow: () => mainWindow, getAppInfo });
-    registerTabIpc({ ...guard, getManager: () => tabManager });
+    registerTabIpc({
+      ...guard,
+      getManager: () => tabManager,
+      popupTabMenu: (manager, id) => {
+        if (mainWindow !== null) popupTabMenu(mainWindow, manager, id);
+      },
+    });
 
     nativeTheme.on('updated', () => {
       mainWindow?.setBackgroundColor(backgroundColor());

@@ -70,6 +70,10 @@ export class TabManager {
     return this.tabs.length;
   }
 
+  get hasClosedTabs(): boolean {
+    return this.closedUrls.length > 0;
+  }
+
   find(id: string): Tab | null {
     return this.tabs.find((tab) => tab.id === id) ?? null;
   }
@@ -151,6 +155,25 @@ export class TabManager {
       // Never leave the window without a tab.
       this.create();
     }
+  }
+
+  /** Closes everything except `id`, leaving that tab active. */
+  closeOthers(id: string): void {
+    for (const tab of [...this.tabs]) {
+      if (tab.id !== id) this.close(tab.id);
+    }
+    this.activate(id);
+  }
+
+  /** Opens the same page in a new tab beside this one. */
+  duplicate(id: string): void {
+    const tab = this.find(id);
+    if (tab === null) return;
+    if (tab.internal !== null) {
+      this.create({ openerId: id });
+      return;
+    }
+    this.create({ url: tab.url, openerId: id });
   }
 
   /** Reopens the most recently closed tab. */

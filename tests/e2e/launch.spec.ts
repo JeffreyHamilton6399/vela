@@ -16,7 +16,7 @@ test.afterAll(async () => {
 
 test('the window launches and renders the chrome', async () => {
   const page = await app.firstWindow();
-  await expect(page.locator('header')).toContainText('Vela');
+  await expect(page.getByRole('tablist', { name: 'Tabs' })).toBeVisible();
   await expect(page.locator('input[aria-label="Address and search"]')).toBeVisible();
 });
 

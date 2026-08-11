@@ -42,7 +42,7 @@ test('opens on the new tab page with one tab', async () => {
   );
 
   expect(state).toMatchObject({ tabs: [{ internal: 'newtab', pinned: false }] });
-  await expect(chrome.getByText('New Tab')).toBeVisible();
+  await expect(chrome.getByRole('tab')).toHaveCount(1);
 });
 
 test('navigating the address bar loads a page into a WebContentsView', async () => {

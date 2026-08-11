@@ -95,6 +95,15 @@ const bridge: VelaBridge = {
     showNewTabPage(id: string): void {
       ipcRenderer.send(SEND_CHANNELS.tabsShowNewTab, { id });
     },
+    closeOthers(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.tabsCloseOthers, { id });
+    },
+    duplicate(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.tabsDuplicate, { id });
+    },
+    openContextMenu(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.menuTab, { id });
+    },
     onStateChanged(listener: (state: BrowserState) => void): () => void {
       const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
         const parsed = browserStateSchema.safeParse(payload);

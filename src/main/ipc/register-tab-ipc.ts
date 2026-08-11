@@ -4,6 +4,8 @@ import { handleInvoke, handleSend, type GuardOptions } from './contract-guard.js
 
 export interface TabIpcDeps extends GuardOptions {
   getManager: () => TabManager | null;
+  /** Pops the native tab context menu at the cursor. */
+  popupTabMenu: (manager: TabManager, id: string) => void;
 }
 
 /** Runs `action` with the live manager, or does nothing if the window is gone. */
@@ -93,6 +95,24 @@ export function registerTabIpc(deps: TabIpcDeps): void {
   handleSend(deps, SEND_CHANNELS.tabsShowNewTab, ({ id }) => {
     withManager(deps, (manager) => {
       manager.showNewTabPage(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.tabsCloseOthers, ({ id }) => {
+    withManager(deps, (manager) => {
+      manager.closeOthers(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.tabsDuplicate, ({ id }) => {
+    withManager(deps, (manager) => {
+      manager.duplicate(id);
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.menuTab, ({ id }) => {
+    withManager(deps, (manager) => {
+      deps.popupTabMenu(manager, id);
     });
   });
 

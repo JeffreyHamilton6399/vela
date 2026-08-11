@@ -27,7 +27,13 @@ export function App(): JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-surface">
-      <TitleBar platform={window.vela.platform} maximized={maximized} focused={focused} />
+      <TitleBar
+        platform={window.vela.platform}
+        maximized={maximized}
+        focused={focused}
+        tabs={browser.tabs}
+        activeTabId={browser.activeTabId}
+      />
       <Toolbar tab={tab} searchEngineId={DEFAULT_SEARCH_ENGINE_ID} addressRef={addressRef} />
 
       {/* The page view is positioned over this element by the main process. */}
