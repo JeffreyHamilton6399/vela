@@ -1,3 +1,4 @@
+import { resolveBang } from './bangs.js';
 import { buildSearchUrl, findSearchEngine } from './search-engines.js';
 
 /**
@@ -8,6 +9,7 @@ import { buildSearchUrl, findSearchEngine } from './search-engines.js';
 export type AddressIntent =
   | { kind: 'navigate'; url: string }
   | { kind: 'search'; query: string; url: string }
+  | { kind: 'bang'; bang: string; query: string; url: string }
   | { kind: 'empty' };
 
 /** Schemes Vela will hand straight to the view. */
@@ -40,6 +42,13 @@ function looksLikeHost(input: string): boolean {
 export function resolveAddressInput(rawInput: string, searchEngineId: string): AddressIntent {
   const input = rawInput.trim();
   if (input === '') return { kind: 'empty' };
+
+  // Bangs are resolved here rather than by bouncing the query off a search
+  // engine, so `!gh electron` never tells DuckDuckGo what you looked for.
+  const bang = resolveBang(input);
+  if (bang !== null) {
+    return { kind: 'bang', bang: bang.bang.bang, query: bang.query, url: bang.url };
+  }
 
   // Host-shape is checked first: `localhost:5173` would otherwise be read as a
   // URL whose scheme is `localhost:`.

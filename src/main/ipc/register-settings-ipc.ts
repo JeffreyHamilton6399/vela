@@ -58,6 +58,10 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
     deps.getStore()?.update(patch);
   });
 
+  handleSend(deps, SEND_CHANNELS.toolsSetNotes, ({ text }) => {
+    deps.getStore()?.update({ notes: text });
+  });
+
   handleSend(deps, SEND_CHANNELS.speedDialAdd, (entry) => {
     const store = deps.getStore();
     if (store === null) return;

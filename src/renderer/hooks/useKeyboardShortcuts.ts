@@ -3,6 +3,10 @@ import type { BrowserState } from '../../shared/types/ipc.js';
 
 export interface ShortcutActions {
   focusAddressBar: () => void;
+  togglePalette: () => void;
+  toggleSidebar: () => void;
+  openSettings: () => void;
+  closeOverlays: () => void;
 }
 
 /** Cmd on macOS, Ctrl everywhere else. */
@@ -11,7 +15,10 @@ function primaryModifier(event: KeyboardEvent): boolean {
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT');
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+  );
 }
 
 /**
@@ -26,6 +33,11 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
     const onKeyDown = (event: KeyboardEvent): void => {
       const mod = primaryModifier(event);
       const key = event.key.toLowerCase();
+
+      if (key === 'escape') {
+        actions.closeOverlays();
+        return;
+      }
 
       if (mod && event.shiftKey) {
         if (key === 't') {
@@ -42,6 +54,18 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
 
       if (mod && !event.shiftKey) {
         switch (key) {
+          case 'k':
+            event.preventDefault();
+            actions.togglePalette();
+            return;
+          case 'b':
+            event.preventDefault();
+            actions.toggleSidebar();
+            return;
+          case ',':
+            event.preventDefault();
+            actions.openSettings();
+            return;
           case 't':
             event.preventDefault();
             window.vela.tabs.create();
@@ -63,6 +87,7 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
         }
       }
 
+      // Anything below here would fight with typing.
       if (isTypingTarget(event.target)) return;
 
       if (key === 'f5') {

@@ -3,11 +3,16 @@ import type { Settings } from '../shared/settings.js';
 import { findSearchEngine } from '../shared/search-engines.js';
 import type { AddressBarHandle } from './components/AddressBar.js';
 import { BlockedCount } from './components/BlockedCount.js';
+import { CommandPalette } from './components/CommandPalette.js';
+import { IconButton } from './components/IconButton.js';
 import { InsecureInterstitial } from './components/InsecureInterstitial.js';
 import { NewTabPage } from './components/NewTabPage.js';
 import { PrivacyPanel } from './components/PrivacyPanel.js';
+import { SettingsPanel } from './components/SettingsPanel.js';
+import { Sidebar, type SidebarTool } from './components/Sidebar.js';
 import { TitleBar } from './components/TitleBar.js';
 import { Toolbar } from './components/Toolbar.js';
+import { SettingsIcon, SidebarIcon } from './components/icons.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
@@ -46,15 +51,40 @@ export function App(): JSX.Element {
 
   const contentRef = useRef<HTMLDivElement>(null);
   const addressRef = useRef<AddressBarHandle | null>(null);
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTool, setSidebarTool] = useState<SidebarTool>('notes');
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
   useContentInsets(contentRef);
-  useOverlay(privacyOpen);
+  // Any of these owns the content region, so the page underneath is hidden
+  // rather than left to paint over Vela's own UI.
+  useOverlay(paletteOpen || settingsOpen || privacyOpen);
 
-  const focusAddressBar = useCallback(() => {
-    addressRef.current?.focus();
+  const closeOverlays = useCallback(() => {
+    setPaletteOpen(false);
+    setSettingsOpen(false);
+    setPrivacyOpen(false);
   }, []);
-  const actions = useMemo(() => ({ focusAddressBar }), [focusAddressBar]);
+
+  const actions = useMemo(
+    () => ({
+      focusAddressBar: () => addressRef.current?.focus(),
+      togglePalette: () => {
+        setPaletteOpen((open) => !open);
+      },
+      toggleSidebar: () => {
+        setSidebarOpen((open) => !open);
+      },
+      openSettings: () => {
+        setSettingsOpen(true);
+      },
+      closeOverlays,
+    }),
+    [closeOverlays],
+  );
   useKeyboardShortcuts(browser, actions);
 
   return (
@@ -75,22 +105,82 @@ export function App(): JSX.Element {
         searchEngineId={settings.searchEngineId}
         addressRef={addressRef}
         trailing={
-          <BlockedCount
-            tab={tab}
-            onClick={() => {
-              setPrivacyOpen(true);
-            }}
-          />
+          <>
+            <BlockedCount
+              tab={tab}
+              onClick={() => {
+                setPrivacyOpen(true);
+              }}
+            />
+            <IconButton
+              label="Toggle sidebar"
+              onClick={() => {
+                setSidebarOpen((open) => !open);
+              }}
+            >
+              <SidebarIcon />
+            </IconButton>
+            <IconButton
+              label="Settings"
+              onClick={() => {
+                setSettingsOpen(true);
+              }}
+            >
+              <SettingsIcon />
+            </IconButton>
+          </>
         }
       />
 
-      {/* The page view is positioned over this element by the main process. */}
-      <div ref={contentRef} className="relative min-h-0 flex-1 bg-surface">
-        <ContentRegion tab={tab} settings={settings} />
-        {privacyOpen ? (
-          <PrivacyPanel
+      <div className="flex min-h-0 flex-1">
+        {/* The page view is positioned over this element by the main process. */}
+        <div
+          ref={contentRef}
+          data-content-region
+          className="relative min-h-0 min-w-0 flex-1 bg-surface"
+        >
+          <ContentRegion tab={tab} settings={settings} />
+
+          {settingsOpen ? (
+            <SettingsPanel
+              settings={settings}
+              onClose={() => {
+                setSettingsOpen(false);
+              }}
+            />
+          ) : null}
+
+          {privacyOpen ? (
+            <PrivacyPanel
+              onClose={() => {
+                setPrivacyOpen(false);
+              }}
+            />
+          ) : null}
+
+          {paletteOpen ? (
+            <CommandPalette
+              browser={browser}
+              onClose={() => {
+                setPaletteOpen(false);
+              }}
+              onOpenSettings={() => {
+                setSettingsOpen(true);
+              }}
+              onToggleSidebar={() => {
+                setSidebarOpen((open) => !open);
+              }}
+            />
+          ) : null}
+        </div>
+
+        {sidebarOpen ? (
+          <Sidebar
+            tool={sidebarTool}
+            notes={settings.notes}
+            onSelect={setSidebarTool}
             onClose={() => {
-              setPrivacyOpen(false);
+              setSidebarOpen(false);
             }}
           />
         ) : null}

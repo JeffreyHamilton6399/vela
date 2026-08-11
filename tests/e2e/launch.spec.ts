@@ -48,6 +48,7 @@ test('the preload bridge is the only surface exposed', async () => {
     'settings',
     'speedDial',
     'tabs',
+    'tools',
     'window',
     'workspaces',
   ]);

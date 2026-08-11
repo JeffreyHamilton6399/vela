@@ -25,9 +25,13 @@ export function WorkspaceBar({ workspaces, activeId }: WorkspaceBarProps): JSX.E
 
   if (workspaces.length === 0) return null;
 
+  // With one workspace there is nothing to switch between, so only the button
+  // that creates a second one is shown. Restraint over completeness.
+  const pills = workspaces.length > 1 ? workspaces : [];
+
   return (
     <div className="no-drag flex shrink-0 items-center gap-[2px]" aria-label="Workspaces">
-      {workspaces.map((workspace) => {
+      {pills.map((workspace) => {
         const active = workspace.id === activeId;
         return (
           <div key={workspace.id} className="group/ws relative flex items-center">

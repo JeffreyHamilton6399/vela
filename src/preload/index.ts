@@ -181,6 +181,11 @@ const bridge: VelaBridge = {
       ipcRenderer.send(SEND_CHANNELS.tabsSetWorkspace, { id, workspaceId });
     },
   },
+  tools: {
+    setNotes(text: string): void {
+      ipcRenderer.send(SEND_CHANNELS.toolsSetNotes, { text });
+    },
+  },
   speedDial: {
     add(entry: SpeedDialAddPayload): void {
       ipcRenderer.send(SEND_CHANNELS.speedDialAdd, entry);

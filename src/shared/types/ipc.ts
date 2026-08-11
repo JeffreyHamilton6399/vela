@@ -178,6 +178,7 @@ export const SEND_CHANNELS = {
   workspacesDelete: 'workspaces:delete',
   workspacesActivate: 'workspaces:activate',
   tabsSetWorkspace: 'tabs:set-workspace',
+  toolsSetNotes: 'tools:set-notes',
   speedDialAdd: 'speeddial:add',
   speedDialRemove: 'speeddial:remove',
   speedDialMove: 'speeddial:move',
@@ -241,6 +242,7 @@ export const sendContract = {
   [SEND_CHANNELS.workspacesDelete]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.workspacesActivate]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.tabsSetWorkspace]: z.object({ id: tabIdString, workspaceId: tabIdString }),
+  [SEND_CHANNELS.toolsSetNotes]: z.object({ text: z.string().max(500_000) }),
   [SEND_CHANNELS.speedDialAdd]: speedDialAddSchema,
   [SEND_CHANNELS.speedDialRemove]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.speedDialMove]: z.object({ id: tabIdString, toIndex: z.number().int().min(0) }),
@@ -334,6 +336,10 @@ export interface VelaBridge {
     activate(id: string): void;
     /** Moves a tab into another workspace, suspending it on the way out. */
     moveTab(id: string, workspaceId: string): void;
+  };
+  readonly tools: {
+    /** Sidebar notes. Local file, never synced anywhere. */
+    setNotes(text: string): void;
   };
   readonly speedDial: {
     add(entry: SpeedDialAddPayload): void;
