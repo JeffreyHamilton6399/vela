@@ -236,25 +236,33 @@
 
       <footer>
         Free and open source.
-        <a href="https://github.com/JeffreyHamilton6399/vela">Source on GitHub</a>. This page is static and
-        loads nothing from anywhere.
+        <a href="https://github.com/JeffreyHamilton6399/vela">Source on GitHub</a>. This page is
+        static and loads nothing from anywhere.
       </footer>
     </main>
 
     <script>
       // OS detection so the big button is the right one. Everything is still
       // one click away, because detection is a guess.
+      // OS detection so the big button is the right one. Everything stays one
+      // click away, because detection is only ever a guess.
       (function () {
-        var RELEASES = 'https://github.com/JeffreyHamilton6399/vela/releases/latest';
+        var REPO = 'https://github.com/JeffreyHamilton6399/vela';
+        var TAG = 'v0.1.0';
+        var ASSET = REPO + '/releases/download/' + TAG + '/';
+
+        var targets = {
+          windows: {
+            label: 'Windows',
+            file: 'Vela-0.1.0-windows.exe',
+            note: 'Windows installer (.exe)',
+          },
+          macos: { label: 'macOS', file: null, note: 'macOS build — not in 0.1.0 yet' },
+          linux: { label: 'Linux', file: null, note: 'Linux build — not in 0.1.0 yet' },
+        };
+
         var ua = navigator.userAgent;
         var platform = navigator.platform || '';
-
-        var targets = [
-          { id: 'windows', label: 'Windows', file: 'Windows installer (.exe)' },
-          { id: 'macos', label: 'macOS', file: 'macOS disk image (.dmg)' },
-          { id: 'linux', label: 'Linux', file: 'Linux AppImage' },
-        ];
-
         var detected = 'windows';
         if (/Mac|iPhone|iPad/.test(ua) || /Mac/.test(platform)) detected = 'macos';
         else if (/Linux|X11|Android/.test(ua)) detected = 'linux';
@@ -262,15 +270,23 @@
         var primary = document.getElementById('primary-download');
         var others = document.getElementById('other-downloads');
 
-        targets.forEach(function (target) {
-          if (target.id === detected) {
-            primary.textContent = 'Download for ' + target.label;
-            primary.href = RELEASES;
-            return;
-          }
+        var chosen = targets[detected];
+        if (chosen.file) {
+          primary.textContent = 'Download for ' + chosen.label;
+          primary.href = ASSET + chosen.file;
+          primary.setAttribute('download', '');
+        } else {
+          primary.textContent = 'Download for Windows';
+          primary.href = ASSET + targets.windows.file;
+          primary.setAttribute('download', '');
+        }
+
+        Object.keys(targets).forEach(function (key) {
+          if (key === detected && targets[key].file) return;
+          var entry = targets[key];
           var link = document.createElement('a');
-          link.href = RELEASES;
-          link.textContent = target.file;
+          link.href = entry.file ? ASSET + entry.file : REPO + '/releases';
+          link.textContent = entry.note;
           others.appendChild(link);
         });
       })();
