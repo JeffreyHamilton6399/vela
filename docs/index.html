@@ -304,9 +304,11 @@
       <section>
         <h2>Where the builds are</h2>
         <p>
-          <strong>Windows is available now.</strong> macOS and Linux builds are produced by the
-          release workflow on their own machines — they cannot be cross-compiled from a Windows
-          desktop, and are not in 0.1.0. The
+          <strong>All three platforms, from 0.1.1 onward.</strong> Each build is made on a machine
+          of its own kind — a <code>.dmg</code> can only be produced on macOS and an
+          <code>.AppImage</code> on Linux, neither cross-compiles from a Windows desktop, and 0.1.0
+          shipped Windows-only for want of a machine to build the other two on. The macOS image is
+          universal: Apple Silicon and Intel in one file. The
           <a href="https://github.com/JeffreyHamilton6399/vela">repository</a> has the details.
         </p>
       </section>
@@ -342,34 +344,62 @@
       // below by hand and go stale honestly rather than silently.
       (function () {
         var REPO = 'https://github.com/JeffreyHamilton6399/vela';
-        var VERSION = '0.1.0';
+        var VERSION = '0.1.1';
         var ASSET = REPO + '/releases/download/v' + VERSION + '/';
 
-        function exe(arch) {
-          return 'Vela-' + VERSION + '-windows-' + arch + '.exe';
+        function asset(platform, arch, ext) {
+          return 'Vela-' + VERSION + '-' + platform + '-' + arch + '.' + ext;
         }
 
-        // Only what the release actually carries. A .dmg has to be built on a
-        // macOS runner and an AppImage on a Linux one, and 0.1.0 was cut before
-        // either ran, so those two have nothing to point at yet. Listing a file
-        // that is not there would be worse than saying so.
+        // Exactly what the release carries, all three platforms of it. Every
+        // one of these is built on a machine of its own kind: a .dmg can only
+        // be made on macOS and an AppImage on Linux, which is why 0.1.0 shipped
+        // Windows-only and why this list was two thirds empty until 0.1.1.
         var targets = {
           windows: {
             label: 'Windows',
             builds: [
-              { arch: 'x64', file: exe('x64'), note: 'Windows · Intel/AMD 64-bit (.exe)' },
-              { arch: 'arm64', file: exe('arm64'), note: 'Windows · ARM64 (.exe)' },
+              {
+                arch: 'x64',
+                file: asset('windows', 'x64', 'exe'),
+                note: 'Windows · Intel/AMD 64-bit (.exe)',
+              },
+              {
+                arch: 'arm64',
+                file: asset('windows', 'arm64', 'exe'),
+                note: 'Windows · ARM64 (.exe)',
+              },
             ],
           },
           macos: {
             label: 'macOS',
-            builds: [],
-            pending: 'macOS build — not in ' + VERSION + ' yet',
+            builds: [
+              {
+                // One universal binary: Apple Silicon and Intel in the same
+                // disk image, so there is no wrong choice to make here.
+                arch: 'universal',
+                file: asset('macos', 'universal', 'dmg'),
+                note: 'macOS · Apple Silicon and Intel (.dmg)',
+              },
+            ],
           },
           linux: {
             label: 'Linux',
-            builds: [],
-            pending: 'Linux build — not in ' + VERSION + ' yet',
+            builds: [
+              {
+                // electron-builder names AppImages by the kernel's own arch
+                // string, so this one is x86_64 where every other target
+                // Vela ships calls the same machine x64.
+                arch: 'x64',
+                file: asset('linux', 'x86_64', 'AppImage'),
+                note: 'Linux · 64-bit (.AppImage)',
+              },
+              {
+                arch: 'arm64',
+                file: asset('linux', 'arm64', 'AppImage'),
+                note: 'Linux · ARM64 (.AppImage)',
+              },
+            ],
           },
         };
 
@@ -411,7 +441,8 @@
             if (target.builds.length === 0) {
               var pending = document.createElement('span');
               pending.className = 'pending';
-              pending.textContent = target.pending;
+              pending.textContent =
+                target.pending || target.label + ' build — not in ' + VERSION + ' yet';
               others.appendChild(pending);
               return;
             }
