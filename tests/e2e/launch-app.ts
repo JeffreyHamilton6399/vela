@@ -7,6 +7,16 @@ import { _electron as electron, type ElectronApplication } from '@playwright/tes
 
 export const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
+/**
+ * The modifier Vela's own shortcuts are bound to on this platform.
+ *
+ * `useKeyboardShortcuts` reads `metaKey` on macOS and `ctrlKey` everywhere
+ * else, the way every Mac application does. A spec that presses `Control+k`
+ * there is pressing a chord the app deliberately does not listen for, so it
+ * tests nothing and fails.
+ */
+export const ACCEL = process.platform === 'darwin' ? 'Meta' : 'Control';
+
 export function fixtureUrl(name: string): string {
   return `file:///${path.join(PROJECT_ROOT, 'tests', 'e2e', 'fixtures', name).replaceAll('\\', '/')}`;
 }

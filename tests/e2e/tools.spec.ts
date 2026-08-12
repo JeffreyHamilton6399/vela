@@ -1,5 +1,5 @@
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { launchVela } from './launch-app.js';
+import { ACCEL, launchVela } from './launch-app.js';
 
 let app: ElectronApplication;
 let closeApp: () => Promise<void>;
@@ -18,7 +18,7 @@ test.afterAll(async () => {
 });
 
 test('the command palette opens on Ctrl+K and filters', async () => {
-  await chrome.keyboard.press('Control+k');
+  await chrome.keyboard.press(`${ACCEL}+k`);
 
   const palette = chrome.getByRole('dialog', { name: 'Command palette' });
   await expect(palette).toBeVisible();
@@ -39,7 +39,7 @@ test('the palette hides the page while it is open, then gives it back', async ()
       return view === undefined ? null : view.getVisible();
     });
 
-  await chrome.keyboard.press('Control+k');
+  await chrome.keyboard.press(`${ACCEL}+k`);
   await expect.poll(visible).toBe(false);
 
   await chrome.keyboard.press('Escape');
@@ -56,7 +56,7 @@ test('the sidebar opens on Ctrl+B and shrinks the page region', async () => {
     });
 
   const before = await insets();
-  await chrome.keyboard.press('Control+b');
+  await chrome.keyboard.press(`${ACCEL}+b`);
 
   await expect(chrome.getByRole('complementary', { name: 'Sidebar tools' })).toBeVisible();
   await expect.poll(insets).toBeLessThan(before);
@@ -87,8 +87,8 @@ test('notes survive a round trip through the local settings file', async () => {
 });
 
 test('settings open on Ctrl+, and write through to the store', async () => {
-  await chrome.keyboard.press('Control+b'); // close the sidebar
-  await chrome.keyboard.press('Control+,');
+  await chrome.keyboard.press(`${ACCEL}+b`); // close the sidebar
+  await chrome.keyboard.press(`${ACCEL}+,`);
 
   await expect(chrome.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await chrome.getByRole('button', { name: 'Privacy' }).click();

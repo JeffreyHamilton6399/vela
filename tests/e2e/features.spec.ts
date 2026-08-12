@@ -1,5 +1,5 @@
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { launchVela, startFixtureServer, type FixtureServer } from './launch-app.js';
+import { ACCEL, launchVela, startFixtureServer, type FixtureServer } from './launch-app.js';
 
 interface Bridge {
   settings: { get: () => Promise<Record<string, unknown>> };
@@ -90,16 +90,16 @@ test.describe('browser features', () => {
   });
 
   test('zoom steps, sticks, and resets', async () => {
-    await chrome.keyboard.press('Control+=');
+    await chrome.keyboard.press(`${ACCEL}+=`);
     await expect.poll(async () => (await activeTab())?.zoomPercent).toBe(120);
 
-    await chrome.keyboard.press('Control+=');
+    await chrome.keyboard.press(`${ACCEL}+=`);
     await expect.poll(async () => (await activeTab())?.zoomPercent).toBe(144);
 
     // The zoom badge appears once the page is not at 100%.
     await expect(chrome.getByRole('button', { name: /Reset zoom/ })).toBeVisible();
 
-    await chrome.keyboard.press('Control+0');
+    await chrome.keyboard.press(`${ACCEL}+0`);
     await expect.poll(async () => (await activeTab())?.zoomPercent).toBe(100);
   });
 
