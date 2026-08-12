@@ -72,9 +72,10 @@ export function PrivacyPanel({ onClose }: PrivacyPanelProps): JSX.Element {
         </div>
 
         <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
-          Nothing. Vela has no servers, no accounts, and no analytics. It makes exactly two kinds of
-          network request: the pages you navigate to, and one check for a new release. Everything it
-          remembers lives in a single local file you can read, edit, or delete.
+          Nothing. Vela has no servers, no accounts, and no analytics. It makes three kinds of
+          network request, and you ask for all of them: the pages you navigate to, one check for a
+          new release, and an assistant model if you choose to download one. Everything it remembers
+          lives in a single local file you can read, edit, or delete.
         </p>
 
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[12px]">

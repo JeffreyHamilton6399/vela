@@ -50,6 +50,14 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
           window.vela.window.openPrivate();
           return;
         }
+        // Reload ignoring the cache. It has to be handled here: the block
+        // below only runs for chords without shift, so this used to fall
+        // through every case and do nothing at all.
+        if (key === 'r') {
+          event.preventDefault();
+          if (activeId !== null) window.vela.tabs.reload(activeId, true);
+          return;
+        }
       }
 
       if (mod && !event.shiftKey) {
@@ -93,7 +101,7 @@ export function useKeyboardShortcuts(state: BrowserState, actions: ShortcutActio
             return;
           case 'r':
             event.preventDefault();
-            if (activeId !== null) window.vela.tabs.reload(activeId, event.shiftKey);
+            if (activeId !== null) window.vela.tabs.reload(activeId);
             return;
           default:
             break;

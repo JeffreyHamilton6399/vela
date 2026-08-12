@@ -11,6 +11,7 @@ import { IconButton } from './components/IconButton.js';
 import { InsecureInterstitial } from './components/InsecureInterstitial.js';
 import { NewTabPage } from './components/NewTabPage.js';
 import type { SidebarTool } from './components/Sidebar.js';
+import type { SettingsCategoryId } from './components/SettingsPanel.js';
 import { TitleBar } from './components/TitleBar.js';
 import { WorkspaceRail } from './components/WorkspaceRail.js';
 import { Toolbar } from './components/Toolbar.js';
@@ -77,6 +78,7 @@ export function App(): JSX.Element {
   const [sidebarTool, setSidebarTool] = useState<SidebarTool>('notes');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategoryId>('general');
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [openPanelId, setOpenPanelId] = useState<string | null>(null);
   const [addingPanel, setAddingPanel] = useState(false);
@@ -92,6 +94,11 @@ export function App(): JSX.Element {
   // rather than left to paint over Vela's own UI. What comes back is a still
   // of the page, so a dialog's scrim has something to be translucent against.
   const pageBehind = useOverlay(paletteOpen || settingsOpen || privacyOpen);
+
+  const openSettings = useCallback((category: SettingsCategoryId = 'general') => {
+    setSettingsCategory(category);
+    setSettingsOpen(true);
+  }, []);
 
   const closeOverlays = useCallback(() => {
     setPaletteOpen(false);
@@ -111,11 +118,11 @@ export function App(): JSX.Element {
         setSidebarOpen((open) => !open);
       },
       openSettings: () => {
-        setSettingsOpen(true);
+        openSettings();
       },
       closeOverlays,
     }),
-    [closeOverlays],
+    [closeOverlays, openSettings],
   );
   useKeyboardShortcuts(browser, actions);
 
@@ -221,7 +228,7 @@ export function App(): JSX.Element {
               }
             }}
             onOpenSettings={() => {
-              setSettingsOpen(true);
+              openSettings();
             }}
           />
 
@@ -251,6 +258,7 @@ export function App(): JSX.Element {
             {settingsOpen ? (
               <SettingsPanel
                 settings={settings}
+                initialCategory={settingsCategory}
                 onClose={() => {
                   setSettingsOpen(false);
                 }}
@@ -272,7 +280,7 @@ export function App(): JSX.Element {
                   setPaletteOpen(false);
                 }}
                 onOpenSettings={() => {
-                  setSettingsOpen(true);
+                  openSettings();
                 }}
                 onToggleSidebar={() => {
                   setSidebarOpen((open) => !open);
@@ -318,8 +326,10 @@ export function App(): JSX.Element {
               onAddPanelDone={() => {
                 setAddingPanel(false);
               }}
+              // The only thing in the sidebar that asks for Settings is the
+              // assistant, and what it is asking for is the model picker.
               onOpenSettings={() => {
-                setSettingsOpen(true);
+                openSettings('assistant');
               }}
               onClose={() => {
                 setSidebarOpen(false);

@@ -15,15 +15,28 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Turns `mod+T` into the spelling this platform uses.
+ * Turns `mod+shift+T` into the spelling this platform uses.
+ *
+ * Windows and Linux name their modifiers and join them with `+`. macOS uses
+ * symbols, no separators, and a fixed order regardless of how the chord was
+ * written — ⌥⇧⌘ — so the two are built rather than substituted.
  *
  * Read at call time rather than at module load: a module-scope `window.vela`
  * would tie this file's import order to the preload's, for a string that is
  * only ever needed once a tooltip is being built.
  */
+const MODIFIER_NAMES: Record<string, string> = { mod: 'Ctrl', alt: 'Alt', shift: 'Shift' };
+
 export function shortcut(keys: string): string {
-  const mac = window.vela.platform === 'darwin';
-  return keys.replace('mod+', mac ? '⌘' : 'Ctrl+').replace('alt+', mac ? '⌥' : 'Alt+');
+  const modifiers = keys.split('+');
+  const key = (modifiers.pop() ?? '').toUpperCase();
+
+  if (window.vela.platform !== 'darwin') {
+    return [...modifiers.map((part) => MODIFIER_NAMES[part] ?? part), key].join('+');
+  }
+
+  const symbol = (name: string, glyph: string): string => (modifiers.includes(name) ? glyph : '');
+  return `${symbol('alt', '⌥')}${symbol('shift', '⇧')}${symbol('mod', '⌘')}${key}`;
 }
 
 /**

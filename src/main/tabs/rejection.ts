@@ -4,17 +4,17 @@
  *
  * Vela sends a plain Chrome user agent and the client hints to match, so a
  * check made against the headers passes. Google's is not made against the
- * headers. It reads the page's own JavaScript, where an Electron build cannot
- * pass: `navigator.userAgentData.brands` carries no `Google Chrome` entry, and
- * `window.chrome` is an empty object where a real Chrome has `runtime`, `csi`,
- * `loadTimes` and `app` hanging off it. Faking either means injecting script
- * into web content, and web content in Vela gets no bridge of any kind — the
- * whole security posture rests on that, and it is not worth trading for one
- * sign-in page.
+ * headers. It reads the page's own JavaScript, where an Electron build gives
+ * itself away: `navigator.userAgentData.brands` carries no `Google Chrome`
+ * entry, and `window.chrome` is an empty object where a real Chrome has
+ * `runtime`, `csi`, `loadTimes` and `app` hanging off it. Both are put back
+ * for Google's sign-in hosts — see chrome-shim.ts — and on the page as
+ * measured that is the whole of the gate.
  *
- * So Vela does not fight it. It recognises the refusal and says what happened,
- * because "Couldn't sign you in" with no explanation reads as Vela being
- * broken, which is the one thing it is not.
+ * None of which is load-bearing. The check belongs to Google and can change
+ * without notice, so this stays: when a refusal happens anyway, Vela
+ * recognises it and says what happened, because "Couldn't sign you in" with no
+ * explanation reads as Vela being broken, which is the one thing it is not.
  */
 
 /** A sign-in refused for being the wrong browser, never for a wrong password. */

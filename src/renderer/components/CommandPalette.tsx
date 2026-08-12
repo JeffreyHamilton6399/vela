@@ -3,6 +3,7 @@ import type { HistoryEntry } from '../../shared/types/ipc.js';
 import { displayUrl } from '../../shared/address-input.js';
 import type { BrowserState } from '../../shared/types/ipc.js';
 import { SearchIcon } from './icons.js';
+import { shortcut } from './IconButton.js';
 
 export interface Command {
   id: string;
@@ -53,7 +54,7 @@ function useCommands(
       {
         id: 'new-tab',
         label: 'New tab',
-        hint: 'Ctrl+T',
+        hint: shortcut('mod+T'),
         group: 'Browser',
         run: () => {
           window.vela.tabs.create();
@@ -62,7 +63,7 @@ function useCommands(
       {
         id: 'private-window',
         label: 'New private window',
-        hint: 'Ctrl+Shift+N',
+        hint: shortcut('mod+shift+N'),
         group: 'Browser',
         run: () => {
           window.vela.window.openPrivate();
@@ -71,7 +72,7 @@ function useCommands(
       {
         id: 'reopen',
         label: 'Reopen closed tab',
-        hint: 'Ctrl+Shift+T',
+        hint: shortcut('mod+shift+T'),
         group: 'Browser',
         run: () => {
           window.vela.tabs.restoreClosed();
@@ -80,14 +81,14 @@ function useCommands(
       {
         id: 'sidebar',
         label: 'Toggle sidebar',
-        hint: 'Ctrl+B',
+        hint: shortcut('mod+B'),
         group: 'Browser',
         run: handlers.onToggleSidebar,
       },
       {
         id: 'settings',
         label: 'Open settings',
-        hint: 'Ctrl+,',
+        hint: shortcut('mod+,'),
         group: 'Browser',
         run: handlers.onOpenSettings,
       },
@@ -138,6 +139,7 @@ export function CommandPalette({
   const [selected, setSelected] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const activeTabId = browser.activeTabId;
   const commands = useCommands(browser, { onOpenSettings, onToggleSidebar, onClose });
@@ -175,6 +177,15 @@ export function CommandPalette({
   useEffect(() => {
     setSelected(0);
   }, [query]);
+
+  // The list scrolls once there are more matches than fit, so arrowing past
+  // the fold has to bring the row with it — otherwise the selection is somewhere
+  // below the visible list and Enter runs something you cannot see.
+  useEffect(() => {
+    listRef.current
+      ?.querySelector(`[data-index="${String(selected)}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
 
   // Local history, searched on this machine. Debounced so a fast typist does
   // not send a query per keystroke.
@@ -255,11 +266,12 @@ export function CommandPalette({
           />
         </div>
 
-        <ul className="max-h-[320px] overflow-auto py-1">
+        <ul ref={listRef} className="max-h-[320px] overflow-auto py-1">
           {matches.map((command, index) => (
             <li key={command.id}>
               <button
                 type="button"
+                data-index={index}
                 aria-current={index === selected ? 'true' : undefined}
                 onMouseEnter={() => {
                   setSelected(index);

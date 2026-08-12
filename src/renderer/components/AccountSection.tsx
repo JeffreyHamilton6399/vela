@@ -38,7 +38,19 @@ export function AccountSection(): JSX.Element {
   /* ----- no account yet ----- */
   if (!state.exists) {
     return (
-      <div className="flex flex-col gap-1 px-1 py-1">
+      // A form, so that Enter in the password field does what Enter in a
+      // password field does everywhere else.
+      <form
+        className="flex flex-col gap-1 px-1 py-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void window.vela.account.create(email, password).then((result) => {
+            setError(result.error);
+            setPassword('');
+            if (result.ok) refresh();
+          });
+        }}
+      >
         <p className="text-[12px] leading-relaxed text-ink-muted">
           Create a Vela account to save the logins you use on websites. It exists only on this
           machine: there is no server to sign in to, nothing is uploaded, and the master password is
@@ -68,14 +80,7 @@ export function AccountSection(): JSX.Element {
         />
 
         <button
-          type="button"
-          onClick={() => {
-            void window.vela.account.create(email, password).then((result) => {
-              setError(result.error);
-              setPassword('');
-              if (result.ok) refresh();
-            });
-          }}
+          type="submit"
           className="focus-ring self-start rounded-lg bg-ink px-2 py-1 text-[13px] font-medium text-surface hover:opacity-90"
         >
           Create account
@@ -87,27 +92,29 @@ export function AccountSection(): JSX.Element {
           There is no password reset, because there is nobody to ask. Forgetting it means the saved
           logins are gone.
         </p>
-      </div>
+      </form>
     );
   }
 
   /* ----- account exists, locked ----- */
   if (!state.unlocked) {
     return (
-      <div className="flex flex-col gap-1 px-1 py-1">
+      <form
+        className="flex flex-col gap-1 px-1 py-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void window.vela.account.unlock(password).then((result) => {
+            setError(result.error);
+            setPassword('');
+            if (result.ok) refresh();
+          });
+        }}
+      >
         <p className="text-[13px] text-ink">Signed out — {state.email}</p>
         <input
           value={password}
           onChange={(event) => {
             setPassword(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            void window.vela.account.unlock(password).then((result) => {
-              setError(result.error);
-              setPassword('');
-              if (result.ok) refresh();
-            });
           }}
           type="password"
           placeholder="Master password"
@@ -115,20 +122,13 @@ export function AccountSection(): JSX.Element {
           className={FIELD}
         />
         <button
-          type="button"
-          onClick={() => {
-            void window.vela.account.unlock(password).then((result) => {
-              setError(result.error);
-              setPassword('');
-              if (result.ok) refresh();
-            });
-          }}
+          type="submit"
           className="focus-ring self-start rounded-lg bg-ink px-2 py-1 text-[13px] font-medium text-surface hover:opacity-90"
         >
           Sign in
         </button>
         {error === null ? null : <span className="text-[12px] text-danger">{error}</span>}
-      </div>
+      </form>
     );
   }
 
@@ -155,7 +155,22 @@ export function AccountSection(): JSX.Element {
         save is the part that watches wider, and it can be turned off below.
       </p>
 
-      <div className="flex flex-col gap-[3px]">
+      <form
+        className="flex flex-col gap-[3px]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void window.vela.account
+            .save(siteHost.trim(), siteUser.trim(), sitePassword)
+            .then((result) => {
+              setError(result.error);
+              if (!result.ok) return;
+              setSiteHost('');
+              setSiteUser('');
+              setSitePassword('');
+              refresh();
+            });
+        }}
+      >
         <span className="text-[12px] font-semibold text-ink">Add a login</span>
         <input
           value={siteHost}
@@ -186,24 +201,12 @@ export function AccountSection(): JSX.Element {
           className={FIELD}
         />
         <button
-          type="button"
-          onClick={() => {
-            void window.vela.account
-              .save(siteHost.trim(), siteUser.trim(), sitePassword)
-              .then((result) => {
-                setError(result.error);
-                if (!result.ok) return;
-                setSiteHost('');
-                setSiteUser('');
-                setSitePassword('');
-                refresh();
-              });
-          }}
+          type="submit"
           className="focus-ring self-start rounded-lg border border-line px-2 py-1 text-[12px] text-ink hover:bg-hover"
         >
           Save login
         </button>
-      </div>
+      </form>
 
       {entries.length === 0 ? (
         <p className="text-[12px] text-ink-muted">Nothing saved yet.</p>

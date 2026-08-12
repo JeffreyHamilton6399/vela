@@ -10,6 +10,9 @@ import { CloseIcon } from './icons.js';
 
 interface SettingsPanelProps {
   settings: Settings;
+  /** Which page to land on. Anything that opens Settings to answer a specific
+      question — the assistant asking for a model — names it here. */
+  initialCategory?: SettingsCategoryId;
   onClose: () => void;
 }
 
@@ -27,11 +30,16 @@ const CATEGORIES = [
   { id: 'data', label: 'Your data' },
 ] as const;
 
-type CategoryId = (typeof CATEGORIES)[number]['id'];
+export type SettingsCategoryId = (typeof CATEGORIES)[number]['id'];
 
+/**
+ * A titled group of settings, separated from the one above it by a rule. The
+ * first on a page has nothing above it to be separated from, so it draws
+ * neither the rule nor the space for it.
+ */
 function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
   return (
-    <section className="flex flex-col gap-1 border-t border-line pt-2">
+    <section className="flex flex-col gap-1 border-t border-line pt-2 first:border-t-0 first:pt-0">
       <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
       {children}
     </section>
@@ -213,8 +221,12 @@ function ModelPicker({
  * Everything here is stored in one local JSON file, which the export button
  * hands back verbatim.
  */
-export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.Element {
-  const [category, setCategory] = useState<CategoryId>('general');
+export function SettingsPanel({
+  settings,
+  initialCategory = 'general',
+  onClose,
+}: SettingsPanelProps): JSX.Element {
+  const [category, setCategory] = useState<SettingsCategoryId>(initialCategory);
   const [importState, setImportState] = useState<string | null>(null);
   const [exported, setExported] = useState<string | null>(null);
 

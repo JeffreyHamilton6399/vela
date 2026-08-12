@@ -111,7 +111,15 @@ export function NewTabPage({ tabId, tiles, searchPlaceholder }: NewTabPageProps)
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState('');
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const gesture = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const gesture = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    moved: boolean;
+    /** The slot main was last told about, so a drag is one message per slot
+        crossed rather than one per pointer event. */
+    lastIndex: number;
+  } | null>(null);
 
   const open = useCallback(
     (url: string) => {
@@ -137,7 +145,10 @@ export function NewTabPage({ tabId, tiles, searchPlaceholder }: NewTabPageProps)
       setDraggingId(current.id);
     }
 
-    window.vela.speedDial.move(current.id, slotAt(grid, event.clientX, event.clientY));
+    const index = slotAt(grid, event.clientX, event.clientY);
+    if (index === current.lastIndex) return;
+    current.lastIndex = index;
+    window.vela.speedDial.move(current.id, index);
   }, []);
 
   const endGesture = useCallback(() => {
@@ -151,7 +162,15 @@ export function NewTabPage({ tabId, tiles, searchPlaceholder }: NewTabPageProps)
   const onPointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>, tile: SpeedDialTile) => {
       if (event.button !== 0) return;
-      gesture.current = { id: tile.id, x: event.clientX, y: event.clientY, moved: false };
+
+      const tiles = [...(gridRef.current?.querySelectorAll<HTMLElement>('[data-tile-id]') ?? [])];
+      gesture.current = {
+        id: tile.id,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+        lastIndex: tiles.indexOf(event.currentTarget),
+      };
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', endGesture);
       window.addEventListener('pointercancel', endGesture);

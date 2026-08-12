@@ -11,10 +11,12 @@ const FIELD =
 /**
  * The sidebar assistant.
  *
- * It talks to whichever key the user put in Settings, and to nothing until
- * they do. Vela ships without a key on purpose: this is a downloadable app, so
- * a key compiled into it would be readable by anyone who unzips the bundle and
- * billed to whoever shipped it.
+ * By default it runs a model inside Vela, on this machine, which is why the
+ * empty state here is about a download rather than a key: Vela ships without
+ * an API key on purpose, since this is a downloadable app and a key compiled
+ * into it would be readable by anyone who unzips the bundle and billed to
+ * whoever shipped it. Ollama and a hosted service are the other two choices,
+ * and each has its own version of "not ready yet" to explain.
  */
 export function Assistant({ onOpenSettings }: AssistantProps): JSX.Element {
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
@@ -25,13 +27,22 @@ export function Assistant({ onOpenSettings }: AssistantProps): JSX.Element {
   const [status, setStatus] = useState<AssistantStatus | null>(null);
 
   // Re-checked whenever the panel opens: Ollama may have been started since.
+  // Re-checked again on every download tick, because the model that makes this
+  // panel usable is usually arriving from Settings while the panel is open, and
+  // a screen that still says "not ready" once it has landed is just wrong.
   useEffect(() => {
     let active = true;
-    void window.vela.assistant.status().then((next) => {
-      if (active) setStatus(next);
-    });
+    const refresh = (): void => {
+      void window.vela.assistant.status().then((next) => {
+        if (active) setStatus(next);
+      });
+    };
+
+    refresh();
+    const unsubscribe = window.vela.assistant.onModelProgress(refresh);
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 
@@ -62,11 +73,20 @@ export function Assistant({ onOpenSettings }: AssistantProps): JSX.Element {
   if (status !== null && !status.ready) {
     return (
       <div className="flex h-full flex-col gap-2 text-[13px] leading-relaxed text-ink-muted">
-        {status.provider === 'ollama' ? (
+        {status.provider === 'local' ? (
+          <>
+            <p className="text-ink">The model is not ready yet.</p>
+            <p>
+              The assistant runs inside Vela itself, on a model that lives on this machine. It
+              arrives once, from Settings, and after that the assistant needs no key, no account and
+              no network at all.
+            </p>
+          </>
+        ) : status.provider === 'ollama' ? (
           <>
             <p className="text-ink">No local model is running.</p>
             <p>
-              The assistant defaults to Ollama on this machine, so it needs no key and nothing you
+              The assistant can talk to Ollama on this machine, so it needs no key and nothing you
               type leaves the computer. Install it from <span className="text-ink">ollama.com</span>
               , then pull a model.
             </p>
@@ -86,7 +106,7 @@ export function Assistant({ onOpenSettings }: AssistantProps): JSX.Element {
           onClick={onOpenSettings}
           className="focus-ring self-start rounded-lg bg-ink px-2 py-1 text-[13px] font-medium text-surface hover:opacity-90"
         >
-          Open Settings
+          {status.provider === 'local' ? 'Choose a model' : 'Open Settings'}
         </button>
       </div>
     );

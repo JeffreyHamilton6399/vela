@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX } from 'react';
 import type { WorkspaceSummary } from '../../shared/types/ipc.js';
 import type { WebPanel } from '../../shared/settings.js';
 import type { SidebarTool } from './Sidebar.js';
@@ -49,6 +49,9 @@ const TOOLS: { id: SidebarTool; label: string; glyph: JSX.Element }[] = [
   { id: 'notes', label: 'Notes', glyph: <NotesIcon width={15} height={15} /> },
 ];
 
+/** Breathing room kept between the "add a site" menu and the window edge. */
+const MENU_MARGIN = 8;
+
 /**
  * Sites people usually want in a sidebar. Picking one adds it as a web panel;
  * they are suggestions, not bundled integrations — each is just a URL.
@@ -88,10 +91,36 @@ export function WorkspaceRail({
   const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuTop, setMenuTop] = useState(0);
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
   }, [creating]);
+
+  /*
+   * Where the "add a site" menu can actually go.
+   *
+   * It used to hang off the button with its bottom edge pinned there, which is
+   * fine near the foot of the rail and wrong everywhere else: a menu taller
+   * than the distance to the top of the window ran off the top of it, taking
+   * the first suggestion with it and leaving it unclickable. So the menu is
+   * placed against the window instead — level with its button where there is
+   * room, pushed back inside where there is not, and scrolling within the
+   * window height if it is somehow taller than that.
+   *
+   * Measured before paint, so the menu never appears in the wrong place first.
+   */
+  useLayoutEffect(() => {
+    const button = menuButtonRef.current;
+    const menu = menuRef.current;
+    if (!menuOpen || button === null || menu === null) return;
+
+    const anchor = button.getBoundingClientRect().top;
+    const room = window.innerHeight - menu.offsetHeight - MENU_MARGIN;
+    setMenuTop(Math.max(MENU_MARGIN, Math.min(anchor, room)));
+  }, [menuOpen, panels.length]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -102,22 +131,29 @@ export function WorkspaceRail({
     const timer = setTimeout(() => {
       window.addEventListener('click', dismiss);
     }, 0);
+    // A resize moves the button out from under a menu that was placed against
+    // the old window; closing is both simpler and less startling than having it
+    // jump somewhere else.
+    window.addEventListener('resize', dismiss);
     return () => {
       clearTimeout(timer);
       window.removeEventListener('click', dismiss);
+      window.removeEventListener('resize', dismiss);
     };
   }, [menuOpen]);
 
   return (
     <nav
       aria-label="Workspaces and tools"
-      className="flex w-6 shrink-0 flex-col items-center gap-1 border-r border-line bg-raised py-1"
+      // A rail with enough workspaces and docked sites to fill the window
+      // scrolls rather than squashing every icon into an oval.
+      className="flex w-6 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-line bg-raised py-1"
     >
       {workspaces.map((workspace, index) => {
         const active = workspace.id === activeId;
         const Glyph = workspaceIcon(index);
         return (
-          <div key={workspace.id} className="group/ws relative">
+          <div key={workspace.id} className="group/ws relative shrink-0">
             <button
               type="button"
               aria-current={active ? 'true' : undefined}
@@ -127,7 +163,7 @@ export function WorkspaceRail({
               onClick={() => {
                 window.vela.workspaces.activate(workspace.id);
               }}
-              className={`focus-ring press flex h-4 w-4 items-center justify-center rounded-lg ${
+              className={`focus-ring press flex h-4 w-4 shrink-0 items-center justify-center rounded-lg ${
                 active ? 'bg-hover text-ink' : 'text-ink-muted hover:bg-hover hover:text-ink'
               }`}
             >
@@ -161,6 +197,7 @@ export function WorkspaceRail({
 
       {creating ? (
         <form
+          className="shrink-0"
           onSubmit={(event) => {
             event.preventDefault();
             const name = draft.trim();
@@ -192,13 +229,13 @@ export function WorkspaceRail({
           onClick={() => {
             setCreating(true);
           }}
-          className="focus-ring press flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
+          className="focus-ring press flex h-4 w-4 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
         >
           <PlusIcon width={12} height={12} />
         </button>
       )}
 
-      <span aria-hidden className="my-[2px] h-px w-3 bg-line" />
+      <span aria-hidden className="my-[2px] h-px w-3 shrink-0 bg-line" />
 
       {TOOLS.map((tool) => (
         <button
@@ -210,7 +247,7 @@ export function WorkspaceRail({
           onClick={() => {
             onPickTool(tool.id);
           }}
-          className={`focus-ring press flex h-4 w-4 items-center justify-center rounded-lg ${
+          className={`focus-ring press flex h-4 w-4 shrink-0 items-center justify-center rounded-lg ${
             sidebarTool === tool.id
               ? 'bg-hover text-ink'
               : 'text-ink-muted hover:bg-hover hover:text-ink'
@@ -232,7 +269,7 @@ export function WorkspaceRail({
             onClick={() => {
               onPickPanel(panel.id);
             }}
-            className={`focus-ring press flex h-4 w-4 items-center justify-center overflow-hidden rounded-lg ${
+            className={`focus-ring press flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-lg ${
               openPanelId === panel.id
                 ? 'bg-hover text-ink'
                 : 'text-ink-muted hover:bg-hover hover:text-ink'
@@ -258,8 +295,9 @@ export function WorkspaceRail({
         </div>
       ))}
 
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
+          ref={menuButtonRef}
           type="button"
           aria-label="Add a site to the sidebar"
           aria-expanded={menuOpen}
@@ -274,9 +312,11 @@ export function WorkspaceRail({
 
         {menuOpen ? (
           <div
+            ref={menuRef}
             role="menu"
             aria-label="Add a site"
-            className="absolute bottom-0 left-5 z-20 w-[210px] overflow-hidden rounded-card border border-line bg-raised py-1 shadow-sm"
+            style={{ top: menuTop }}
+            className="fixed left-[54px] z-20 max-h-[calc(100vh-16px)] w-[210px] overflow-y-auto rounded-card border border-line bg-raised py-1 shadow-sm"
           >
             {SUGGESTED_SITES.filter(
               (site) => !panels.some((panel) => panel.url.startsWith(site.url)),
@@ -310,14 +350,15 @@ export function WorkspaceRail({
         ) : null}
       </div>
 
-      <span className="flex-1" />
-
+      {/* Pinned to the foot of the rail by the margin rather than by a spacer,
+          so that a rail with too much in it scrolls with Settings still on the
+          end of the list instead of pushed out of reach. */}
       <button
         type="button"
         title={`Settings (${shortcut('mod+,')})`}
         aria-label="Settings"
         onClick={onOpenSettings}
-        className="focus-ring press flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
+        className="focus-ring press mt-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
       >
         <SettingsIcon width={15} height={15} />
       </button>

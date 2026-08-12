@@ -3,11 +3,14 @@ import type { AssistantMessage, AssistantReply, AssistantStatus } from '../../sh
 /**
  * The sidebar assistant.
  *
- * Two providers, and the default is the private one:
+ * Three providers, and the default is the private one:
  *
- * - **Ollama**, running on this machine. No key, no account, and no request
- *   that leaves the computer — `localhost` is not the internet. This is what
- *   Vela uses unless you tell it otherwise.
+ * - **In Vela**, on a model file downloaded once and run in-process. No key,
+ *   no account, no port, and no request at all once the file is here. This is
+ *   what Vela uses unless you tell it otherwise.
+ * - **Ollama**, running on this machine, for people who already have it. No
+ *   key and no request that leaves the computer — `localhost` is not the
+ *   internet.
  * - **A hosted service**, using a key the user pastes into Settings. Vela ships
  *   without a key and could not usefully ship with one: it is a downloadable
  *   app, so an embedded key sits in `app.asar` for anyone who unzips it.

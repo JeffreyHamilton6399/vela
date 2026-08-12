@@ -21,7 +21,8 @@ const PINNED_WIDTH = 40;
 const MAX_TAB_WIDTH = 220;
 const MIN_TAB_WIDTH = 56;
 const GAP = 2;
-const NEW_TAB_BUTTON_WIDTH = 34;
+/** The 28px button plus the 8px margin that separates it from the last tab. */
+const NEW_TAB_BUTTON_WIDTH = 36;
 /** Pointer travel before a press turns into a drag. */
 const DRAG_THRESHOLD = 4;
 

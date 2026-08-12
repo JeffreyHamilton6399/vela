@@ -9,10 +9,12 @@ import type { TabSnapshot } from '../../shared/types/ipc.js';
  * secure. It is neither a bug nor a password problem, and the honest thing is
  * to say which it is and offer the way round it.
  *
- * The way round is the machine's own browser. Vela cannot pass the check
- * without injecting script into the page to impersonate Chrome's JavaScript,
- * and web content in Vela gets no bridge of any kind — that is the posture the
- * rest of the browser is built on, and one sign-in page does not buy it back.
+ * Vela does put back the parts of Chrome's JavaScript surface Google checks
+ * for — see chrome-shim.ts — and on the measured page that is the whole of the
+ * gate. It is nobody's guarantee: the check is Google's to change whenever it
+ * likes, and a build where the shim did not take behaves as Vela did before.
+ * This banner is what that case looks like, and the way round it is the
+ * machine's own browser.
  */
 export function SignInRejectedBanner({ tab }: { tab: TabSnapshot | null }): JSX.Element | null {
   const service = tab?.signInRejectedBy ?? null;
@@ -27,9 +29,10 @@ export function SignInRejectedBanner({ tab }: { tab: TabSnapshot | null }): JSX.
         <strong className="font-medium text-ink">
           {service} would not sign you in on this browser.
         </strong>{' '}
-        Nothing is wrong with your password. {service} checks for browser features Vela does not
-        expose to pages, and Vela will not inject code into a page to pretend otherwise. Signing in
-        with your usual browser works, and the rest of {service} is fine here.
+        Nothing is wrong with your password. {service} checks the browser itself before it checks
+        anything you typed, and this time Vela did not satisfy the check — which {service} is free
+        to change whenever it likes. Signing in with your usual browser works, and the rest of{' '}
+        {service} is fine here.
       </span>
 
       <button

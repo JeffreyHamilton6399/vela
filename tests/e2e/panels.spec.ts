@@ -118,3 +118,30 @@ test('removing a panel takes it off the rail', async () => {
 
   await expect.poll(async () => (await settings()).webPanels.length).toBe(0);
 });
+
+/*
+ * Runs last, with no panels docked, because that is the case that used to
+ * break: the menu was pinned by its bottom edge to a button sitting high in
+ * the rail, so the full list of suggestions ran off the top of the window and
+ * took the first one out of reach.
+ */
+test('the add-a-site menu opens inside the window, whole', async () => {
+  await chrome.getByRole('button', { name: 'Add a site to the sidebar' }).click();
+
+  const menu = chrome.getByRole('menu', { name: 'Add a site' });
+  await expect(menu).toBeVisible();
+
+  const [box, windowHeight] = await Promise.all([
+    menu.boundingBox(),
+    chrome.evaluate(() => window.innerHeight),
+  ]);
+
+  expect(box).not.toBeNull();
+  if (box === null) return;
+
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(windowHeight);
+
+  // The first suggestion especially: it is the one that went missing.
+  await expect(menu.getByRole('menuitem').first()).toBeInViewport();
+});

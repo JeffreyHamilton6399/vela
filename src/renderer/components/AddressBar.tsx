@@ -69,6 +69,17 @@ export function AddressBar({
     if (!editing) setValue(shown.text);
   }, [shown.text, editing]);
 
+  // Why a fill did not happen is worth saying, and worth saying only once.
+  useEffect(() => {
+    if (fillNote === null) return;
+    const timer = setTimeout(() => {
+      setFillNote(null);
+    }, 6000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [fillNote]);
+
   useImperativeHandle(handleRef, () => ({
     focus: () => {
       inputRef.current?.focus();
@@ -107,7 +118,7 @@ export function AddressBar({
         spellCheck={false}
         autoComplete="off"
         aria-label="Address and search"
-        placeholder={fillNote ?? 'Search or enter an address'}
+        placeholder="Search or enter an address"
         className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-muted"
         onChange={(event) => {
           setValue(event.target.value);
@@ -132,15 +143,28 @@ export function AddressBar({
           }
         }}
       />
+      {/* Said here rather than in the placeholder, which is only ever visible
+          on an empty address bar — that is, never on the page you just tried
+          to fill a login for. */}
+      {fillNote === null ? null : (
+        <span
+          role="status"
+          title={fillNote}
+          className="min-w-0 max-w-[220px] shrink truncate text-[11px] text-danger"
+        >
+          {fillNote}
+        </span>
+      )}
+
       {tab !== null && tab.internal === null && tab.url !== '' ? (
         <button
           type="button"
           aria-label="Fill saved login"
           title="Fill the saved login for this site"
           onClick={() => {
+            setFillNote(null);
             void window.vela.account.fill(tab.id).then((result) => {
               setFillNote(result.ok ? null : result.error);
-              if (result.ok) setFillNote(null);
             });
           }}
           className="focus-ring shrink-0 rounded-lg p-[2px] text-ink-muted transition-colors duration-150 hover:text-ink"
