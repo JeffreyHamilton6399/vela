@@ -238,6 +238,7 @@ export const INVOKE_CHANNELS = {
   historyClear: 'history:clear',
   assistantAsk: 'assistant:ask',
   assistantStatus: 'assistant:status',
+  layoutOpenOverlay: 'layout:open-overlay',
   assistantPull: 'assistant:pull',
   assistantInstall: 'assistant:install',
   accountState: 'account:state',
@@ -337,6 +338,13 @@ export const invokeContract = {
     response: settingsImportResultSchema,
   },
   [INVOKE_CHANNELS.downloadsGet]: { request: emptySchema, response: z.array(downloadItemSchema) },
+  // Hiding the page and photographing it have to happen in that order and
+  // without a gap, so they are one call. The reply is what the page looked
+  // like a moment before it went, for the dialog to sit on top of.
+  [INVOKE_CHANNELS.layoutOpenOverlay]: {
+    request: z.object({ open: z.boolean() }),
+    response: z.object({ snapshot: z.string().nullable() }),
+  },
   [INVOKE_CHANNELS.historySearch]: {
     request: z.object({ query: z.string().max(200), limit: z.number().int().min(1).max(200) }),
     response: z.array(historyEntrySchema),
@@ -631,5 +639,11 @@ export interface VelaBridge {
     setInsets(insets: ContentInsetsPayload): void;
     /** Hides the page while a chrome overlay owns the content region. */
     setOverlayOpen(open: boolean): void;
+    /**
+     * The same thing, but answering with a still of the page as it was just
+     * before it went, so a dialog can be laid over the page you were reading
+     * rather than over a flat colour. Null when there was no page to catch.
+     */
+    openOverlay(open: boolean): Promise<string | null>;
   };
 }

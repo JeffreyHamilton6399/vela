@@ -499,6 +499,49 @@ export class TabManager {
     this.syncVisibility();
   }
 
+  /**
+   * Hides the page for an overlay and hands back a still of it.
+   *
+   * A dialog that covers the content region has to hide the page — a
+   * `WebContentsView` paints above the window's own contents, so a translucent
+   * scrim over a live page is not something the compositor will give us here.
+   * Photographing the page first means the scrim still has something to be
+   * translucent against, instead of a flat sheet of the surface colour.
+   *
+   * The still is only ever a still. Nothing behind a modal is going anywhere,
+   * and it sits under a blur, so a frozen frame reads no differently.
+   */
+  async openOverlay(open: boolean): Promise<string | null> {
+    if (!open) {
+      this.setOverlayOpen(false);
+      return null;
+    }
+
+    const snapshot = await this.capturePage();
+    this.setOverlayOpen(true);
+    return snapshot;
+  }
+
+  /** A PNG data URL of the page as it stands, or null if there is no page. */
+  private async capturePage(): Promise<string | null> {
+    const tab = this.attached;
+    if (tab === null || tab.chromeOwnsContent) return null;
+
+    const contents = tab.webContents;
+    if (contents === null) return null;
+
+    try {
+      const image = await contents.capturePage();
+      if (image.isEmpty()) return null;
+      // Downscaled hard: it is going behind a blur and a 70% scrim, so the
+      // pixels are wasted and the data URL would otherwise be enormous.
+      return image.resize({ width: 480, quality: 'good' }).toDataURL();
+    } catch {
+      // A page that cannot be photographed simply does not get a backdrop.
+      return null;
+    }
+  }
+
   /* ----------------------------------------------------------------- */
   /* Ordering                                                           */
   /* ----------------------------------------------------------------- */

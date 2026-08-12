@@ -88,8 +88,9 @@ export function App(): JSX.Element {
   useContentInsets(contentRef);
   usePanelBounds(sidebarRef, openPanelId !== null);
   // Any of these owns the content region, so the page underneath is hidden
-  // rather than left to paint over Vela's own UI.
-  useOverlay(paletteOpen || settingsOpen || privacyOpen);
+  // rather than left to paint over Vela's own UI. What comes back is a still
+  // of the page, so a dialog's scrim has something to be translucent against.
+  const pageBehind = useOverlay(paletteOpen || settingsOpen || privacyOpen);
 
   const closeOverlays = useCallback(() => {
     setPaletteOpen(false);
@@ -228,6 +229,19 @@ export function App(): JSX.Element {
             className="relative min-h-0 min-w-0 flex-1 bg-surface"
           >
             <ContentRegion tab={tab} settings={settings} />
+
+            {/* The page as it was a moment ago, for a dialog to sit on. Purely
+                decorative, and never interactive: the real page is hidden
+                behind it and comes straight back when the dialog closes. */}
+            {pageBehind === null ? null : (
+              <img
+                src={pageBehind}
+                alt=""
+                aria-hidden
+                draggable={false}
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top select-none"
+              />
+            )}
 
             {settings.onboardingComplete ? null : <Onboarding settings={settings} />}
 

@@ -207,4 +207,10 @@ export function registerTabIpc(deps: TabIpcDeps): void {
       manager.setOverlayOpen(open);
     });
   });
+
+  handleInvoke(deps, INVOKE_CHANNELS.layoutOpenOverlay, async ({ open }, sender) => {
+    const manager = deps.getManager(sender);
+    if (manager === null) return { snapshot: null };
+    return { snapshot: await manager.openOverlay(open) };
+  });
 }

@@ -394,6 +394,10 @@ const bridge: VelaBridge = {
     setInsets(insets: ContentInsetsPayload): void {
       ipcRenderer.send(SEND_CHANNELS.layoutSetInsets, insets);
     },
+    async openOverlay(open: boolean): Promise<string | null> {
+      const reply: unknown = await ipcRenderer.invoke(INVOKE_CHANNELS.layoutOpenOverlay, { open });
+      return z.object({ snapshot: z.string().nullable() }).parse(reply).snapshot;
+    },
     setOverlayOpen(open: boolean): void {
       ipcRenderer.send(SEND_CHANNELS.layoutSetOverlay, { open });
     },
