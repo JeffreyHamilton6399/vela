@@ -62,7 +62,10 @@ linux:
       arch: [x64, arm64]
   category: Network;WebBrowser
   synopsis: A privacy-focused web browser
-  desktopName: vela.desktop
+  # The .desktop filename comes from `desktopName` in package.json, which is
+  # what `syncDesktopName` reads — it is not an option here, and electron-builder
+  # rejects the whole config for carrying it. Setting it in both places is what
+  # kept every Linux and macOS build from ever starting.
   syncDesktopName: true
   artifactName: Vela-${version}-linux-${arch}.${ext}
   desktop:
