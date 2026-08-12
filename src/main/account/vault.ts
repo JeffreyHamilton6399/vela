@@ -1,4 +1,10 @@
-import { randomBytes, scryptSync, timingSafeEqual, createCipheriv, createDecipheriv } from 'node:crypto';
+import {
+  randomBytes,
+  scryptSync,
+  timingSafeEqual,
+  createCipheriv,
+  createDecipheriv,
+} from 'node:crypto';
 import ElectronStore from 'electron-store';
 import { z } from 'zod';
 

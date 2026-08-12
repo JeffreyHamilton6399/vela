@@ -99,7 +99,10 @@ for (let y = 0; y < SIZE; y += 1) {
     const [r, g, b] = gradientAt((cx / SIZE) * 0.45 + (cy / SIZE) * 0.55);
 
     // The sail and hull are knocked out of the gradient in near-white.
-    const mark = Math.max(coverage(triangleDistance(cx, cy, SAIL)), coverage(triangleDistance(cx, cy, HULL)));
+    const mark = Math.max(
+      coverage(triangleDistance(cx, cy, SAIL)),
+      coverage(triangleDistance(cx, cy, HULL)),
+    );
 
     const offset = (y * SIZE + x) * 4;
     pixels[offset] = Math.round(r + (250 - r) * mark);
@@ -156,4 +159,6 @@ const out = path.resolve(process.cwd(), 'build');
 mkdirSync(out, { recursive: true });
 writeFileSync(path.join(out, 'icon.png'), png);
 
-console.log(`wrote build/icon.png (${String(SIZE)}×${String(SIZE)}, ${String(Math.round(png.length / 1024))} KiB)`);
+console.log(
+  `wrote build/icon.png (${String(SIZE)}×${String(SIZE)}, ${String(Math.round(png.length / 1024))} KiB)`,
+);

@@ -42,7 +42,10 @@ export default tseslint.config(
       'no-restricted-globals': [
         'error',
         { name: 'fetch', message: 'Vela makes no network requests from the chrome renderer.' },
-        { name: 'XMLHttpRequest', message: 'Vela makes no network requests from the chrome renderer.' },
+        {
+          name: 'XMLHttpRequest',
+          message: 'Vela makes no network requests from the chrome renderer.',
+        },
         { name: 'WebSocket', message: 'Vela makes no network requests from the chrome renderer.' },
       ],
     },
