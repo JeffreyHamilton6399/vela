@@ -69,22 +69,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  pages:
-    name: Landing page
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-      - id: deploy
-        uses: actions/deploy-pages@v4
+# The landing page is not deployed from here. Pages is configured to serve
+# `docs/` straight off main, so every push that touches the page is already
+# live by the time a tag is cut — and `actions/deploy-pages` refuses to run
+# against a repository configured that way, so a job here would fail the first
+# release rather than publish anything. Switching Pages to build from a
+# workflow is a settings change, not a workflow change, and there is nothing to
+# gain from it while the page is static files in the repo.
