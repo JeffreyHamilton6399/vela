@@ -152,22 +152,8 @@ One spacing unit is 8px (`--spacing: 0.5rem`), so every integer Tailwind spacing
 
 ## CI
 
-> **The workflows are parked and not running yet.** They live at
-> `ci/github-workflows/` rather than `.github/workflows/`, because GitHub refuses a
-> push that touches workflow files unless the pushing token carries the `workflow`
-> scope. To switch them on:
->
-> ```sh
-> gh auth refresh -s workflow
-> git mv ci/github-workflows .github/workflows
-> git commit -m "Enable CI" && git push
-> ```
->
-> Until then, `npm run verify` and `npm run test:e2e` are the gates, run locally,
-> and releases are built with `npm run package`.
-
 `ci.yml` runs typecheck → lint → format → unit tests, then the Playwright suite on a Windows / macOS / Linux matrix.
 
-`release.yml` fires on a `v*` tag: it runs the same gates, then builds installers on all three platforms and attaches them to the Release. **This is the only thing that can produce the macOS `.dmg` and Linux `.AppImage` that 0.1.0 is missing** — a `.dmg` can only be made on macOS, and neither cross-compiles from Windows. Until the workflows come out of `ci/github-workflows/`, the only other route is running `npm run package` on a Mac and a Linux box by hand and uploading the results with `gh release upload`.
+`release.yml` fires on a `v*` tag: it runs the same gates, then builds installers on all three platforms and attaches them to the Release. It is the only thing that can produce the macOS `.dmg` and the Linux `.AppImage` — a `.dmg` can only be made on macOS, and neither target cross-compiles from Windows, so 0.1.0 shipped Windows-only for want of a runner. `npm run verify` and `npm run test:e2e` remain the local gates.
 
 The landing page is not deployed from the workflow. Pages serves `docs/` straight off `main`, so a push that touches the page is live within a minute or two of landing.
