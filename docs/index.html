@@ -115,6 +115,13 @@
         color: var(--ink-muted);
       }
 
+      /* A platform the current release has no build for. Not a link, because
+         there is nothing yet to link to. */
+      .others .pending {
+        color: var(--ink-muted);
+        opacity: 0.65;
+      }
+
       section {
         border-top: 1px solid var(--line);
         padding-top: 32px;
@@ -328,53 +335,116 @@
     </main>
 
     <script>
-      // OS detection so the big button is the right one. Everything is still
-      // one click away, because detection is a guess.
-      // OS detection so the big button is the right one. Everything stays one
-      // click away, because detection is only ever a guess.
+      // OS and architecture detection, so the big button is the right one.
+      // Everything stays one click away, because detection is only ever a
+      // guess — and nothing here asks the network which build exists. This page
+      // loads nothing from anywhere, so the release's contents are written out
+      // below by hand and go stale honestly rather than silently.
       (function () {
         var REPO = 'https://github.com/JeffreyHamilton6399/vela';
-        var TAG = 'v0.1.0';
-        var ASSET = REPO + '/releases/download/' + TAG + '/';
+        var VERSION = '0.1.0';
+        var ASSET = REPO + '/releases/download/v' + VERSION + '/';
 
+        function exe(arch) {
+          return 'Vela-' + VERSION + '-windows-' + arch + '.exe';
+        }
+
+        // Only what the release actually carries. A .dmg has to be built on a
+        // macOS runner and an AppImage on a Linux one, and 0.1.0 was cut before
+        // either ran, so those two have nothing to point at yet. Listing a file
+        // that is not there would be worse than saying so.
         var targets = {
           windows: {
             label: 'Windows',
-            file: 'Vela-0.1.0-windows.exe',
-            note: 'Windows installer (.exe)',
+            builds: [
+              { arch: 'x64', file: exe('x64'), note: 'Windows · Intel/AMD 64-bit (.exe)' },
+              { arch: 'arm64', file: exe('arm64'), note: 'Windows · ARM64 (.exe)' },
+            ],
           },
-          macos: { label: 'macOS', file: null, note: 'macOS build — not in 0.1.0 yet' },
-          linux: { label: 'Linux', file: null, note: 'Linux build — not in 0.1.0 yet' },
+          macos: {
+            label: 'macOS',
+            builds: [],
+            pending: 'macOS build — not in ' + VERSION + ' yet',
+          },
+          linux: {
+            label: 'Linux',
+            builds: [],
+            pending: 'Linux build — not in ' + VERSION + ' yet',
+          },
         };
 
         var ua = navigator.userAgent;
-        var platform = navigator.platform || '';
         var detected = 'windows';
-        if (/Mac|iPhone|iPad/.test(ua) || /Mac/.test(platform)) detected = 'macos';
+        if (/Mac|iPhone|iPad/.test(ua) || /Mac/.test(navigator.platform || '')) detected = 'macos';
         else if (/Linux|X11|Android/.test(ua)) detected = 'linux';
 
         var primary = document.getElementById('primary-download');
         var others = document.getElementById('other-downloads');
 
-        var chosen = targets[detected];
-        if (chosen.file) {
-          primary.textContent = 'Download for ' + chosen.label;
-          primary.href = ASSET + chosen.file;
-          primary.setAttribute('download', '');
-        } else {
-          primary.textContent = 'Download for Windows';
-          primary.href = ASSET + targets.windows.file;
-          primary.setAttribute('download', '');
+        function pick(entry, arch) {
+          for (var i = 0; i < entry.builds.length; i += 1) {
+            if (entry.builds[i].arch === arch) return entry.builds[i];
+          }
+          return entry.builds[0] || null;
         }
 
-        Object.keys(targets).forEach(function (key) {
-          if (key === detected && targets[key].file) return;
-          var entry = targets[key];
-          var link = document.createElement('a');
-          link.href = entry.file ? ASSET + entry.file : REPO + '/releases';
-          link.textContent = entry.note;
-          others.appendChild(link);
-        });
+        function render(arch) {
+          var entry = targets[detected];
+          var chosen = pick(entry, arch);
+
+          if (chosen) {
+            primary.textContent = 'Download for ' + entry.label;
+            primary.href = ASSET + chosen.file;
+            primary.setAttribute('download', '');
+          } else {
+            // Nothing to hand this visitor, so send them somewhere true rather
+            // than at an installer for an operating system they are not on.
+            primary.textContent = 'All downloads';
+            primary.href = REPO + '/releases/latest';
+            primary.removeAttribute('download');
+          }
+
+          others.textContent = '';
+          Object.keys(targets).forEach(function (key) {
+            var target = targets[key];
+
+            if (target.builds.length === 0) {
+              var pending = document.createElement('span');
+              pending.className = 'pending';
+              pending.textContent = target.pending;
+              others.appendChild(pending);
+              return;
+            }
+
+            target.builds.forEach(function (build) {
+              // The one already on the big button does not need repeating.
+              if (chosen && build.file === chosen.file) return;
+              var link = document.createElement('a');
+              link.href = ASSET + build.file;
+              link.setAttribute('download', '');
+              link.textContent = build.note;
+              others.appendChild(link);
+            });
+          });
+        }
+
+        // Windows on ARM reports itself as x64 in the user agent for
+        // compatibility, so the string cannot answer this: the client-hint API
+        // is the only thing that knows. It is local and asynchronous, so the
+        // page renders on the safe guess first and corrects itself if asked.
+        render('x64');
+
+        var data = navigator.userAgentData;
+        if (data && typeof data.getHighEntropyValues === 'function') {
+          data
+            .getHighEntropyValues(['architecture'])
+            .then(function (hints) {
+              if (hints && hints.architecture === 'arm') render('arm64');
+            })
+            .catch(function () {
+              // The safe guess is already on screen, and both are listed below.
+            });
+        }
       })();
     </script>
   </body>
