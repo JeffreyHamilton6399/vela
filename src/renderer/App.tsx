@@ -5,7 +5,7 @@ import type { AddressBarHandle } from './components/AddressBar.js';
 import { findBookmark } from '../shared/bookmarks.js';
 import { BlockedCount } from './components/BlockedCount.js';
 import { BookmarksBar } from './components/BookmarksBar.js';
-import { DownloadsPanel, useDownloads } from './components/DownloadsPanel.js';
+import { useDownloads } from './components/DownloadsPanel.js';
 import { Onboarding } from './components/Onboarding.js';
 import { IconButton } from './components/IconButton.js';
 import { InsecureInterstitial } from './components/InsecureInterstitial.js';
@@ -15,6 +15,7 @@ import { TitleBar } from './components/TitleBar.js';
 import { WorkspaceRail } from './components/WorkspaceRail.js';
 import { Toolbar } from './components/Toolbar.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
+import { SaveLoginPrompt, useCapturedLogin } from './components/SaveLoginPrompt.js';
 import { CloseIcon, DownloadIcon } from './components/icons.js';
 import { usePanelBounds } from './hooks/usePanelBounds.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
@@ -65,6 +66,7 @@ export function App(): JSX.Element {
   const settings = useSettings();
   const { maximized, focused } = useWindowState();
   const update = useUpdateState();
+  const [captured, setCaptured] = useCapturedLogin();
   useThemePreference(settings.theme);
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -75,7 +77,6 @@ export function App(): JSX.Element {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [downloadsOpen, setDownloadsOpen] = useState(false);
   const [openPanelId, setOpenPanelId] = useState<string | null>(null);
   const [addingPanel, setAddingPanel] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -94,7 +95,8 @@ export function App(): JSX.Element {
     setPaletteOpen(false);
     setSettingsOpen(false);
     setPrivacyOpen(false);
-    setDownloadsOpen(false);
+    // The bubble is main's to close: it lives in its own view over the page.
+    window.vela.downloads.closePopup();
   }, []);
 
   const actions = useMemo(
@@ -151,8 +153,10 @@ export function App(): JSX.Element {
                   ? `Downloads — ${String(activeDownloads)} in progress`
                   : 'Downloads'
               }
+              // The bubble lives in its own view over the page, so main owns
+              // whether it is up; see download-popup.ts.
               onClick={() => {
-                setDownloadsOpen((open) => !open);
+                window.vela.downloads.togglePopup();
               }}
               className={activeDownloads > 0 ? 'text-ink' : ''}
             >
@@ -167,6 +171,13 @@ export function App(): JSX.Element {
       ) : null}
 
       <UpdateBanner state={update} />
+
+      <SaveLoginPrompt
+        captured={captured}
+        onResolved={() => {
+          setCaptured(null);
+        }}
+      />
 
       <Suspense fallback={null}>
         <div className="flex min-h-0 flex-1">
@@ -217,15 +228,6 @@ export function App(): JSX.Element {
             className="relative min-h-0 min-w-0 flex-1 bg-surface"
           >
             <ContentRegion tab={tab} settings={settings} />
-
-            {downloadsOpen ? (
-              <DownloadsPanel
-                items={downloads}
-                onClose={() => {
-                  setDownloadsOpen(false);
-                }}
-              />
-            ) : null}
 
             {settings.onboardingComplete ? null : <Onboarding settings={settings} />}
 

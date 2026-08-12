@@ -41,6 +41,9 @@ export const workspaceSchema = z.object({
 });
 export type Workspace = z.infer<typeof workspaceSchema>;
 
+export const loginAutofillSchema = z.enum(['off', 'fill', 'submit']);
+export type LoginAutofill = z.infer<typeof loginAutofillSchema>;
+
 export const settingsSchema = z.object({
   version: z.literal(1).default(1),
 
@@ -100,6 +103,29 @@ export const settingsSchema = z.object({
   proxyRules: z.string().max(500).default(''),
   proxyEnabled: z.boolean().default(false),
 
+  /**
+   * What Vela does with a saved login when you land on that site.
+   *
+   * `off` is the old behaviour: nothing happens until you press the key button
+   * in the address bar. `fill` puts the credential in as the page loads.
+   * `submit` also presses the login button, which is the only setting that
+   * gets you through a login without touching anything.
+   *
+   * This only ever applies to a host you have saved a password for, so the
+   * fill script reaches those sites and no others.
+   */
+  loginAutofill: loginAutofillSchema.default('fill'),
+
+  /**
+   * Whether Vela offers to remember a login you type by hand.
+   *
+   * This is the one setting that widens where Vela injects: to notice a login
+   * on a site you have not saved yet, it has to watch pages it holds nothing
+   * for. The watcher reports only what a submitted login form contained, and
+   * runs on no page at all while the vault is locked.
+   */
+  offerToSaveLogins: z.boolean().default(true),
+
   /** Sites docked into the sidebar, in the manner of Opera's web panels. */
   webPanels: z.array(webPanelSchema).default([]),
 });
@@ -132,6 +158,8 @@ export const settingsPatchSchema = z.object({
   assistantApiKey: z.string().max(400).optional(),
   proxyRules: z.string().max(500).optional(),
   proxyEnabled: z.boolean().optional(),
+  loginAutofill: loginAutofillSchema.optional(),
+  offerToSaveLogins: z.boolean().optional(),
 });
 
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;

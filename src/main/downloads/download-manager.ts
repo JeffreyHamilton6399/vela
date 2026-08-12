@@ -4,6 +4,16 @@ import type { DownloadItem } from '../../shared/types/ipc.js';
 
 const MAX_REMEMBERED = 50;
 
+export interface DownloadEvents {
+  /** The list changed and the UI should redraw. */
+  onChanged: (items: DownloadItem[]) => void;
+  /**
+   * A download started or reached its end. This is what a browser surfaces a
+   * bubble for; the steady stream of progress ticks in between is not.
+   */
+  onNotable: (item: DownloadItem) => void;
+}
+
 /**
  * Tracks downloads for one window's session.
  *
@@ -17,7 +27,7 @@ export class DownloadManager {
 
   constructor(
     session: Session,
-    private readonly onChanged: (items: DownloadItem[]) => void,
+    private readonly events: DownloadEvents,
   ) {
     session.on('will-download', (_event, item) => {
       this.track(item);
@@ -40,18 +50,26 @@ export class DownloadManager {
       receivedBytes: item.getReceivedBytes(),
       totalBytes: item.getTotalBytes(),
       savePath: item.getSavePath(),
-      startedAt: item.getStartTime() * 1000,
+      // `getStartTime` is fractional seconds, so the milliseconds are not a
+      // whole number. The contract says this field is an integer, and it means
+      // it: an unrounded value fails validation on the way out, which took the
+      // whole downloads list with it rather than just this field.
+      startedAt: Math.round(item.getStartTime() * 1000),
     });
 
-    this.items = [snapshot(), ...this.items].slice(0, MAX_REMEMBERED);
+    const started = snapshot();
+    this.items = [started, ...this.items].slice(0, MAX_REMEMBERED);
     this.emit();
+    this.events.onNotable(started);
 
     item.on('updated', () => {
       this.replace(id, snapshot());
     });
 
     item.once('done', () => {
-      this.replace(id, snapshot());
+      const finished = snapshot();
+      this.replace(id, finished);
+      this.events.onNotable(finished);
     });
   }
 
@@ -61,7 +79,7 @@ export class DownloadManager {
   }
 
   private emit(): void {
-    this.onChanged(this.items);
+    this.events.onChanged(this.items);
   }
 
   /** Opens a finished download with whatever the OS considers its handler. */

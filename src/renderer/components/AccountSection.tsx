@@ -149,10 +149,10 @@ export function AccountSection(): JSX.Element {
       </div>
 
       <p className="text-[12px] leading-relaxed text-ink-muted">
-        Saved logins live in an encrypted file here. On a site you have saved, the address bar’s key
-        button fills the form — Vela does it when you ask rather than on every page load, because
-        filling automatically would mean giving every website a script from Vela, which is exactly
-        what this browser refuses to do.
+        Saved logins live in an encrypted file here. Sign in somewhere by hand and Vela offers to
+        remember it; after that it fills the form as the page loads, and the address bar’s key
+        button fills it again on demand. Filling reaches only the hosts in this list — offering to
+        save is the part that watches wider, and it can be turned off below.
       </p>
 
       <div className="flex flex-col gap-[3px]">

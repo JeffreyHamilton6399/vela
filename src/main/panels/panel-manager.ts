@@ -1,4 +1,10 @@
-import { WebContentsView, type BrowserWindow, type Session } from 'electron';
+import {
+  WebContentsView,
+  type BrowserWindow,
+  type ContextMenuParams,
+  type Session,
+  type WebContents,
+} from 'electron';
 import type { Bounds } from '../tabs/layout.js';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
 import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
@@ -10,6 +16,8 @@ export interface PanelManagerOptions {
   onOpenInTab: (url: string) => void;
   /** The panel reported an icon; the caller caches it and stores it. */
   onFavicon: (id: string, pageUrl: string, iconUrl: string) => void;
+  /** A right-click inside a panel, with what was under the pointer. */
+  onContextMenu: (contents: WebContents, params: ContextMenuParams) => void;
 }
 
 /**
@@ -108,6 +116,12 @@ export class PanelManager {
     view.webContents.on('page-favicon-updated', (_event, favicons) => {
       const icon = favicons[0];
       if (icon !== undefined) this.options.onFavicon(id, view.webContents.getURL(), icon);
+    });
+
+    // A docked panel is web content like any tab, so right-clicking in one
+    // offers the same things rather than nothing at all.
+    view.webContents.on('context-menu', (_event, params) => {
+      this.options.onContextMenu(view.webContents, params);
     });
 
     void view.webContents.loadURL(url).catch(() => {

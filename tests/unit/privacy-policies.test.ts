@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alignBrandListWithChrome,
+  applyClientHints,
   buildUserAgent,
   categorizeRequest,
   decideHttpsUpgrade,
-  stripCrossOriginReferer,
+  trimCrossOriginReferer,
   UPDATE_FEED_URL,
 } from '../../src/main/privacy/policies.js';
 
@@ -32,33 +34,144 @@ describe('user agent', () => {
   });
 });
 
-describe('stripCrossOriginReferer', () => {
-  it('removes a referer pointing at another origin', () => {
-    const headers = { Referer: 'https://private.example/secret', Accept: '*/*' };
-    expect(stripCrossOriginReferer(headers, 'https://tracker.example/pixel')).toEqual({
+describe('alignBrandListWithChrome', () => {
+  const CHROMIUM = '"Not;A=Brand";v="8", "Chromium";v="150"';
+
+  it('adds the Chrome brand an Electron embedder never advertises', () => {
+    expect(alignBrandListWithChrome(CHROMIUM)).toBe(
+      '"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"',
+    );
+  });
+
+  it('takes the version from the Chromium entry, so the two can never disagree', () => {
+    const aligned = alignBrandListWithChrome('"Chromium";v="151"');
+    expect(aligned).toBe('"Chromium";v="151", "Google Chrome";v="151"');
+  });
+
+  it('leaves a list that already claims Chrome alone', () => {
+    const already = '"Chromium";v="150", "Google Chrome";v="150"';
+    expect(alignBrandListWithChrome(already)).toBe(already);
+  });
+
+  it('leaves a list with no Chromium entry alone', () => {
+    expect(alignBrandListWithChrome('"Firefox";v="140"')).toBe('"Firefox";v="140"');
+  });
+
+  it('passes through anything it cannot parse rather than mangling it', () => {
+    expect(alignBrandListWithChrome('')).toBe('');
+    expect(alignBrandListWithChrome('garbage')).toBe('garbage');
+  });
+
+  it('keeps every install identical', () => {
+    expect(alignBrandListWithChrome(CHROMIUM)).toBe(alignBrandListWithChrome(CHROMIUM));
+  });
+});
+
+describe('applyClientHints', () => {
+  const IDENTITY = { platform: 'win32', chromeMajorVersion: '150' };
+  const SECURE = 'https://accounts.example/signin';
+
+  it('adds the hints Electron never sends, so the UA is not alone in claiming Chrome', () => {
+    const headers = applyClientHints({ Accept: 'text/html' }, SECURE, IDENTITY);
+
+    expect(headers['Sec-CH-UA']).toBe(
+      '"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"',
+    );
+    expect(headers['Sec-CH-UA-Mobile']).toBe('?0');
+    expect(headers['Sec-CH-UA-Platform']).toBe('"Windows"');
+    expect(headers['Accept']).toBe('text/html');
+  });
+
+  it('names each platform the way Chrome does', () => {
+    const platform = (name: string): unknown =>
+      applyClientHints({}, SECURE, { platform: name, chromeMajorVersion: '150' })[
+        'Sec-CH-UA-Platform'
+      ];
+
+    expect(platform('darwin')).toBe('"macOS"');
+    expect(platform('win32')).toBe('"Windows"');
+    expect(platform('freebsd')).toBe('"Linux"');
+  });
+
+  it('volunteers nothing to a plain-http origin, as Chrome does not', () => {
+    expect(applyClientHints({ Accept: '*/*' }, 'http://example.com/', IDENTITY)).toEqual({
       Accept: '*/*',
     });
   });
 
-  it('keeps a same-origin referer, which leaks nothing new', () => {
+  it('still sends them to loopback, which Chromium counts as secure', () => {
+    const headers = applyClientHints({}, 'http://localhost:5273/', IDENTITY);
+    expect(headers['Sec-CH-UA-Mobile']).toBe('?0');
+  });
+
+  it('aligns a brand list Chromium did send rather than adding a second one', () => {
+    const headers = applyClientHints(
+      {
+        'sec-ch-ua': '"Chromium";v="150"',
+        'sec-ch-ua-full-version-list': '"Chromium";v="150.0.7871.212"',
+      },
+      SECURE,
+      IDENTITY,
+    );
+
+    expect(headers['sec-ch-ua']).toBe('"Chromium";v="150", "Google Chrome";v="150"');
+    expect(headers['sec-ch-ua-full-version-list']).toBe(
+      '"Chromium";v="150.0.7871.212", "Google Chrome";v="150.0.7871.212"',
+    );
+    expect(headers['Sec-CH-UA']).toBeUndefined();
+  });
+
+  it('never contradicts a hint the request already carried', () => {
+    const headers = applyClientHints({ 'sec-ch-ua-platform': '"Android"' }, SECURE, IDENTITY);
+    expect(headers['sec-ch-ua-platform']).toBe('"Android"');
+    expect(headers['Sec-CH-UA-Platform']).toBeUndefined();
+  });
+
+  it('keeps every install identical', () => {
+    expect(applyClientHints({}, SECURE, IDENTITY)).toEqual(applyClientHints({}, SECURE, IDENTITY));
+  });
+});
+
+describe('trimCrossOriginReferer', () => {
+  it('cuts a cross-origin referer back to its origin, keeping the path private', () => {
+    const headers = { Referer: 'https://private.example/secret', Accept: '*/*' };
+    expect(trimCrossOriginReferer(headers, 'https://tracker.example/pixel')).toEqual({
+      Accept: '*/*',
+      Referer: 'https://private.example/',
+    });
+  });
+
+  it('leaves an origin for a cross-origin login POST to check, so CSRF passes', () => {
+    const headers = { Referer: 'https://app.example/login' };
+    expect(trimCrossOriginReferer(headers, 'https://auth.example/session')).toEqual({
+      Referer: 'https://app.example/',
+    });
+  });
+
+  it('keeps a same-origin referer whole, which leaks nothing new', () => {
     const headers = { Referer: 'https://example.com/a', Accept: '*/*' };
-    expect(stripCrossOriginReferer(headers, 'https://example.com/b')).toEqual(headers);
+    expect(trimCrossOriginReferer(headers, 'https://example.com/b')).toEqual(headers);
   });
 
-  it('treats a scheme change as cross-origin', () => {
+  it('sends nothing at all when https drops to http', () => {
     const headers = { Referer: 'https://example.com/a' };
-    expect(stripCrossOriginReferer(headers, 'http://example.com/b')).toEqual({});
+    expect(trimCrossOriginReferer(headers, 'http://example.com/b')).toEqual({});
   });
 
-  it('matches the header name case-insensitively', () => {
+  it('matches the header name case-insensitively and keeps that spelling', () => {
     expect(
-      stripCrossOriginReferer({ referer: 'https://a.example/' }, 'https://b.example/'),
-    ).toEqual({});
+      trimCrossOriginReferer({ referer: 'https://a.example/x' }, 'https://b.example/'),
+    ).toEqual({ referer: 'https://a.example/' });
   });
 
   it('leaves headers alone when there is no referer', () => {
     const headers = { Accept: '*/*' };
-    expect(stripCrossOriginReferer(headers, 'https://example.com/')).toBe(headers);
+    expect(trimCrossOriginReferer(headers, 'https://example.com/')).toBe(headers);
+  });
+
+  it('passes a referer it cannot parse through untouched', () => {
+    const headers = { Referer: 'not a url' };
+    expect(trimCrossOriginReferer(headers, 'https://example.com/')).toBe(headers);
   });
 });
 

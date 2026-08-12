@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import type { DownloadItem } from '../../shared/types/ipc.js';
 import { CloseIcon, DownloadIcon } from './icons.js';
 
@@ -125,7 +125,7 @@ export function DownloadsPanel({
   onClose: () => void;
 }): JSX.Element {
   return (
-    <div className="absolute right-2 top-2 z-10 w-[340px] overflow-hidden rounded-card border border-line bg-raised shadow-sm">
+    <div className="overflow-hidden rounded-card border border-line bg-raised shadow-sm">
       <div className="flex items-center justify-between gap-1 border-b border-line px-2 py-1">
         <span className="flex items-center gap-1 text-[13px] font-medium text-ink">
           <DownloadIcon width={14} height={14} />
@@ -163,6 +163,57 @@ export function DownloadsPanel({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * The whole of the bubble's renderer.
+ *
+ * It is its own `WebContentsView`, so the only thing on the page is the card,
+ * and the view is trimmed to whatever height the card comes out at — measured
+ * here and reported to main. Everything outside those few hundred pixels stays
+ * the page's, which is the entire reason the bubble is not drawn in the chrome
+ * renderer with the rest of the UI.
+ */
+export function DownloadsBubble(): JSX.Element {
+  const items = useDownloads();
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = cardRef.current;
+    if (element === null) return;
+
+    const report = (): void => {
+      window.vela.downloads.reportPopupHeight(Math.ceil(element.getBoundingClientRect().height));
+    };
+
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') window.vela.downloads.closePopup();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
+  return (
+    <div ref={cardRef}>
+      <DownloadsPanel
+        items={items}
+        onClose={() => {
+          window.vela.downloads.closePopup();
+        }}
+      />
     </div>
   );
 }

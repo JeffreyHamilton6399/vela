@@ -22,6 +22,8 @@ import {
   assistantReplySchema,
   assistantStatusSchema,
   accountStateSchema,
+  capturedLoginSchema,
+  type CapturedLogin,
   actionResultSchema,
   vaultEntrySchema,
   windowStateSchema,
@@ -216,6 +218,15 @@ const bridge: VelaBridge = {
     clear(): void {
       ipcRenderer.send(SEND_CHANNELS.downloadsClear);
     },
+    togglePopup(): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsPopupToggle);
+    },
+    closePopup(): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsPopupClose);
+    },
+    reportPopupHeight(height: number): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsPopupHeight, { height });
+    },
     onChanged(listener: (items: DownloadItem[]) => void): () => void {
       const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
         const parsed = z.array(downloadItemSchema).safeParse(payload);
@@ -259,6 +270,21 @@ const bridge: VelaBridge = {
       return z
         .object({ ok: z.boolean(), error: z.string().nullable(), filled: z.number() })
         .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.vaultFill, { tabId }));
+    },
+    async resolveCapture(id: string, save: boolean): Promise<ActionResult> {
+      return actionResultSchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.vaultResolveCapture, { id, save }),
+      );
+    },
+    onCaptured(listener: (captured: CapturedLogin) => void): () => void {
+      const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
+        const parsed = capturedLoginSchema.safeParse(payload);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(EVENT_CHANNELS.loginCaptured, wrapped);
+      return () => {
+        ipcRenderer.off(EVENT_CHANNELS.loginCaptured, wrapped);
+      };
     },
   },
   assistant: {

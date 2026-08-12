@@ -1,8 +1,15 @@
 import type { Session, WebContents } from 'electron';
-import { categorizeRequest, stripCrossOriginReferer } from './policies.js';
+import {
+  applyClientHints,
+  categorizeRequest,
+  trimCrossOriginReferer,
+  type BrowserIdentity,
+} from './policies.js';
 
 export interface HardenOptions {
   userAgent: string;
+  /** The platform and Chromium version the client hints have to agree with. */
+  identity: BrowserIdentity;
   isDev: boolean;
   stripReferer: () => boolean;
   /** Development-only report of a request Vela should never have made. */
@@ -24,11 +31,13 @@ export function hardenSession(session: Session, options: HardenOptions): void {
   session.setPermissionCheckHandler(() => false);
 
   session.webRequest.onBeforeSendHeaders((details, callback) => {
-    const headers = options.stripReferer()
-      ? stripCrossOriginReferer(details.requestHeaders, details.url)
+    const referer = options.stripReferer()
+      ? trimCrossOriginReferer(details.requestHeaders, details.url)
       : details.requestHeaders;
 
-    callback({ requestHeaders: headers });
+    // The UA above claims Chrome; the client hints have to say the same thing,
+    // or a sign-in page reads the disagreement as an embedded webview.
+    callback({ requestHeaders: applyClientHints(referer, details.url, options.identity) });
   });
 
   if (options.isDev) {

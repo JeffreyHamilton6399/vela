@@ -28,6 +28,7 @@ export function Toolbar({
     <div className="drag flex h-6 shrink-0 items-center gap-1 border-b border-line bg-raised px-1">
       <IconButton
         label="Back"
+        hint="alt+←"
         disabled={!(tab?.canGoBack ?? false)}
         onClick={() => {
           if (id !== null) window.vela.tabs.goBack(id);
@@ -38,6 +39,7 @@ export function Toolbar({
 
       <IconButton
         label="Forward"
+        hint="alt+→"
         disabled={!(tab?.canGoForward ?? false)}
         onClick={() => {
           if (id !== null) window.vela.tabs.goForward(id);
@@ -58,6 +60,7 @@ export function Toolbar({
       ) : (
         <IconButton
           label="Reload"
+          hint="mod+R"
           disabled={tab?.internal !== null}
           onClick={() => {
             if (id !== null) window.vela.tabs.reload(id);

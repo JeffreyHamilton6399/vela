@@ -1,17 +1,29 @@
-import { WebContentsView, type Session } from 'electron';
+import {
+  WebContentsView,
+  type BrowserWindow,
+  type ContextMenuParams,
+  type Session,
+} from 'electron';
 import type { TabSnapshot } from '../../shared/types/ipc.js';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
 import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
+import { allowPopup, isPopupDisposition } from './popup-window.js';
 
 export interface TabEvents {
   /** Any change worth redrawing the tab strip for. */
   onChanged: (tab: Tab) => void;
-  /** A link that asked for a new tab (target=_blank, window.open). */
+  /** A link that asked for a new tab (target=_blank, plain window.open). */
   onOpenInNewTab: (url: string, opener: Tab) => void;
+  /** A sized `window.open`, which is what a sign-in popup looks like. */
+  onOpenPopup: (window: BrowserWindow) => void;
   /** Resolves a locally cached icon for a page; remote icons never reach the UI. */
   resolveFavicon: (pageUrl: string, iconUrl: string) => void;
   /** A completed top-level navigation: history and per-host zoom hang off this. */
   onNavigated: (tab: Tab) => void;
+  /** The page's DOM is ready. Login autofill hangs off this. */
+  onDomReady: (tab: Tab) => void;
+  /** A right-click inside the page, with what was under the pointer. */
+  onContextMenu: (tab: Tab, params: ContextMenuParams) => void;
   /**
    * Vets a navigation before it happens. Returning a different URL upgrades
    * it; returning null shows the plain-http interstitial instead.
@@ -321,9 +333,18 @@ export class Tab {
 
     applyWebRtcPolicy(contents);
 
-    contents.setWindowOpenHandler(({ url }) => {
+    // Chrome's own split: a `window.open` carrying window features is a popup,
+    // and anything else — target=_blank, a bare `window.open(url)` — is a tab.
+    // Signing in depends on the first half being a real window that can talk
+    // back to its opener; see popup-window.ts.
+    contents.setWindowOpenHandler(({ url, disposition }) => {
+      if (isPopupDisposition(disposition)) return allowPopup();
       this.events.onOpenInNewTab(url, this);
       return { action: 'deny' };
+    });
+
+    contents.on('did-create-window', (popup) => {
+      this.events.onOpenPopup(popup);
     });
 
     // Link clicks inside the page go through the same https policy as
@@ -372,6 +393,14 @@ export class Tab {
       this.currentUrl = url;
       this.changed();
       this.events.onNavigated(this);
+    });
+
+    contents.on('dom-ready', () => {
+      this.events.onDomReady(this);
+    });
+
+    contents.on('context-menu', (_event, params) => {
+      this.events.onContextMenu(this, params);
     });
 
     contents.on('did-navigate-in-page', (_event, url, isMainFrame) => {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { BrowserWindow, Session } from 'electron';
+import type { BrowserWindow, ContextMenuParams, Session } from 'electron';
 import type { BrowserState } from '../../shared/types/ipc.js';
 import type { Workspace } from '../../shared/settings.js';
 import { resolveAddressInput } from '../../shared/address-input.js';
@@ -13,6 +13,7 @@ import {
 } from './layout.js';
 import { indexOfTab, insertTab, moveTab, nextActiveId, removeTab, setPinned } from './tab-order.js';
 import { selectTabsToSuspend } from './suspension.js';
+import { configurePopup } from './popup-window.js';
 import { Tab } from './tab.js';
 
 export interface CreateTabOptions {
@@ -40,9 +41,15 @@ export interface TabManagerOptions {
   getIdleMinutes: () => number;
   /** Records a visit. A private window passes a no-op.  */
   recordVisit: (url: string, title: string) => void;
+  /** A tab whose DOM is ready. Login autofill hangs off this. */
+  onPageReady: (tab: Tab) => void;
+  /** A right-click inside a page, with what was under the pointer. */
+  onPageContextMenu: (tab: Tab, params: ContextMenuParams) => void;
   /** Chromium zoom level remembered for a host, or 0. */
   getZoomForHost: (host: string) => number;
   setZoomForHost: (host: string, level: number) => void;
+  /** The page region moved, for anything else that has to float over it. */
+  onContentBounds?: () => void;
   isPrivate: boolean;
 }
 
@@ -201,10 +208,24 @@ export class TabManager {
         onOpenInNewTab: (url, opener) => {
           this.create({ url, active: true, openerId: opener.id });
         },
+        onOpenPopup: (popup) => {
+          configurePopup(popup, {
+            vetNavigation: (url) => this.vetNavigation(url),
+            openInNewTab: (url) => {
+              this.create({ url, active: true });
+            },
+          });
+        },
         vetNavigation: (url) => this.vetNavigation(url),
         onNavigated: (navigated) => {
           this.applyStoredZoom(navigated);
           this.options.recordVisit(navigated.url, navigated.snapshot().title);
+        },
+        onDomReady: (ready) => {
+          this.options.onPageReady(ready);
+        },
+        onContextMenu: (clicked, params) => {
+          this.options.onPageContextMenu(clicked, params);
         },
         resolveFavicon: (pageUrl, iconUrl) => {
           void this.options.resolveFavicon(pageUrl, iconUrl).then((dataUrl) => {
@@ -572,16 +593,24 @@ export class TabManager {
     this.applyBounds();
   }
 
+  /** The rectangle the page occupies, whether or not a page is in it. */
+  get contentBounds(): Bounds {
+    const [width = 0, height = 0] = this.options.window.getContentSize();
+    return computeViewBounds({ width, height }, this.insets);
+  }
+
   /** Cheap enough for every resize tick: it no-ops when nothing moved. */
   private applyBounds(): void {
-    if (this.attached === null || this.disposed) return;
-    if (this.options.window.isDestroyed()) return;
+    if (this.disposed || this.options.window.isDestroyed()) return;
 
+    // Anything else anchored to the page — the downloads bubble — tracks the
+    // same rectangle, so it is told even while no tab is attached.
+    this.options.onContentBounds?.();
+
+    if (this.attached === null) return;
+    const bounds = this.contentBounds;
     const view = this.attached.view;
     if (view === null) return;
-
-    const [width = 0, height = 0] = this.options.window.getContentSize();
-    const bounds = computeViewBounds({ width, height }, this.insets);
 
     if (this.lastBounds !== null && boundsEqual(this.lastBounds, bounds)) return;
     this.lastBounds = bounds;

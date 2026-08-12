@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sign in</title>
+  </head>
+  <body>
+    <h1>Sign in</h1>
+    <form
+      id="login"
+      onsubmit="
+        window.__submitted = true;
+        return false;
+      "
+    >
+      <input id="username" name="username" autocomplete="username" />
+      <input id="password" name="password" type="password" autocomplete="current-password" />
+      <button type="submit">Sign in</button>
+    </form>
+
+    <!-- A search box outside the form: Vela must leave it alone. -->
+    <input id="search" name="q" type="text" placeholder="Search" />
+  </body>
+</html>

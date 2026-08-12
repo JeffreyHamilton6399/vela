@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import type { WorkspaceSummary } from '../../shared/types/ipc.js';
 import type { WebPanel } from '../../shared/settings.js';
 import type { SidebarTool } from './Sidebar.js';
+import { shortcut } from './IconButton.js';
 import {
   BeakerIcon,
   BookIcon,
@@ -126,7 +127,7 @@ export function WorkspaceRail({
               onClick={() => {
                 window.vela.workspaces.activate(workspace.id);
               }}
-              className={`focus-ring flex h-4 w-4 items-center justify-center rounded-lg transition-colors duration-150 ${
+              className={`focus-ring press flex h-4 w-4 items-center justify-center rounded-lg ${
                 active ? 'bg-hover text-ink' : 'text-ink-muted hover:bg-hover hover:text-ink'
               }`}
             >
@@ -191,7 +192,7 @@ export function WorkspaceRail({
           onClick={() => {
             setCreating(true);
           }}
-          className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
+          className="focus-ring press flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
         >
           <PlusIcon width={12} height={12} />
         </button>
@@ -209,7 +210,7 @@ export function WorkspaceRail({
           onClick={() => {
             onPickTool(tool.id);
           }}
-          className={`focus-ring flex h-4 w-4 items-center justify-center rounded-lg transition-colors duration-150 ${
+          className={`focus-ring press flex h-4 w-4 items-center justify-center rounded-lg ${
             sidebarTool === tool.id
               ? 'bg-hover text-ink'
               : 'text-ink-muted hover:bg-hover hover:text-ink'
@@ -231,7 +232,7 @@ export function WorkspaceRail({
             onClick={() => {
               onPickPanel(panel.id);
             }}
-            className={`focus-ring flex h-4 w-4 items-center justify-center overflow-hidden rounded-lg transition-colors duration-150 ${
+            className={`focus-ring press flex h-4 w-4 items-center justify-center overflow-hidden rounded-lg ${
               openPanelId === panel.id
                 ? 'bg-hover text-ink'
                 : 'text-ink-muted hover:bg-hover hover:text-ink'
@@ -266,7 +267,7 @@ export function WorkspaceRail({
           onClick={() => {
             setMenuOpen((open) => !open);
           }}
-          className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
+          className="focus-ring press flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
         >
           <GlobeIcon width={14} height={14} />
         </button>
@@ -313,10 +314,10 @@ export function WorkspaceRail({
 
       <button
         type="button"
-        title="Settings"
+        title={`Settings (${shortcut('mod+,')})`}
         aria-label="Settings"
         onClick={onOpenSettings}
-        className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
+        className="focus-ring press flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
       >
         <SettingsIcon width={15} height={15} />
       </button>

@@ -31,9 +31,10 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 
 - **First-run screen** that asks where your searches should go — DuckDuckGo, Startpage, Brave, Ecosia, Google or Bing — and says plainly which of them build a profile from them.
 - **Tabs** with drag reordering, pinning, restore-last-closed, and native context menus.
+- **A page context menu** that changes with what you right-clicked: save a link, image, video or audio file, copy an address, open it in a new tab, or search your selection with the engine you chose. Native rather than drawn by the chrome, because an OS menu floats above the page where an HTML one would be painted underneath it. What goes in it is `buildPageMenu`, which is plain data and unit tested.
 - **Workspaces**: named tab groups. Leaving one suspends its tabs, so an idle workspace costs storage for its titles and nothing else.
 - **Speed Dial** new tab page with locally cached favicons.
-- **Bookmarks** with a bar, **local history** that feeds the command palette, and a **downloads** list.
+- **Bookmarks** with a bar, **local history** that feeds the command palette, and **downloads** in a bubble that raises itself over the top right of the page as a file lands.
 - **Per-site zoom** that sticks (`Ctrl+=` / `Ctrl+-` / `Ctrl+0`).
 - **Command palette** (`Ctrl+K`), a **sidebar** (`Ctrl+B`) holding the assistant, notes and the sites you dock, and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
 - **Private windows** (`Ctrl+Shift+N`) on a memory-only session.
@@ -51,7 +52,17 @@ Only the hosted option adds a network destination beyond the two above, which is
 
 Settings → Account creates a **local** account: an email as a label and a master password that unlocks an encrypted file. The master password is never stored, only a separate scrypt derivation of it, so the file without the password is unreadable. Credentials are AES-256-GCM under a key derived the same way. There is no password reset, because there is nobody to ask.
 
-On a site you have saved, the key button in the address bar fills the login. It does that **when you ask**, not on every page load: filling automatically would mean injecting a Vela script into every website you visit, and Vela's tabs deliberately carry no bridge at all. The fill script is injected into one page at the moment you click, and leaves nothing behind.
+Sign in to a site by hand and Vela offers to remember it — the same prompt Chrome shows. After that it fills the login as the page loads, and Settings → Account can tell it to press the sign-in button as well. The key button in the address bar still fills on demand, overwriting whatever is in the boxes.
+
+Two scripts do this, and they cost different amounts. The **fill** script goes into a page only when the vault is unlocked _and_ already holds a credential for that exact host, so it reaches the handful of sites you save passwords for and no others. The **watcher** behind "offer to save logins" is the expensive one: to notice a login on a site you have not saved yet, it has to run on pages Vela holds nothing for. That is a real trade and the setting says so rather than burying it. What stays true either way: both are ordinary injections that die with their document, neither is a preload, tabs still carry no standing bridge, the watcher reads nothing until a login is submitted, and nothing runs anywhere while the vault is locked.
+
+The captured password never reaches the chrome renderer. It waits in the main process while the prompt — host and username only — is drawn, and the buttons answer by id.
+
+It is careful about what it touches: never a page showing two password boxes (that is a sign-up or a password change, not a login), never a field you have already typed into, and never a bare text box that has not identified itself as a username — which is what keeps your email out of search boxes. Auto-submit fires only when a password went in or the page marked the field `autocomplete="username"`, and it stops where the site does: a second factor or a "was this you?" prompt is still yours to answer.
+
+`loginAutofill` is `off`, `fill` or `submit`, defaulting to `fill`; `offerToSaveLogins` is the watcher, and defaults on.
+
+A sign-in page can still refuse you for reasons Vela does not control — a second factor, a code from your phone, a "was this you?" challenge. Vela fills and submits; it does not pretend to answer those.
 
 ### Web panels
 
@@ -123,13 +134,19 @@ tests/
 
 `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, `webSecurity: true` — asserted by unit tests on every platform, and by an E2E test that confirms `require`, `process` and `ipcRenderer` are all absent from the renderer.
 
+**Browser identity.** Every install on a platform sends the same plain Chrome user agent, naming neither Vela nor Electron — randomising it per install would be a fingerprint, not a defence. The client hints have to say the same thing, and Electron sends none of them at all: Chromium only emits `Sec-CH-UA` for an embedder that supplies user-agent metadata, and Electron exposes no way to. That leaves a browser claiming `Chrome/150` in its user agent and sending no brand list whatsoever, which no real Chrome has ever done and which a sign-in front end reads as an embedded webview. Vela sends the three low-entropy hints Chrome sends unprompted, derived from the same platform and version the user agent is built from, and aligns any brand list Chromium does send so both halves name Chrome. The higher-entropy hints are never volunteered, and nothing is sent to a plain-http origin. An e2e test asserts on what a real page request actually receives, rather than on the string Vela meant to send.
+
+**Signing in.** A "Sign in with …" button calls `window.open` with window features, keeps the handle it gets back, and waits for the popup to answer through `window.opener`. Vela follows Chrome's own rule: features mean a real popup window, no features mean a tab. The popup carries the same four non-negotiable flags a tab does and no preload, and dies with the tab that opened it. `Referer` is trimmed rather than removed — another origin learns which site you came from and never which page, which is what Chrome and Firefox both do by default, and leaves the origin that CSRF middleware falls back to when a login POSTs across origins.
+
 The chrome renderer ships a `default-src 'none'; connect-src 'none'` CSP in production, cannot navigate, and cannot open windows. ESLint forbids `fetch`, `XMLHttpRequest` and `WebSocket` in renderer source: if the chrome can reach the network, the two-request promise is already broken.
 
-The password vault never stores the master password, only a separate scrypt derivation used to check it, and holds the encryption key in memory for exactly as long as you are signed in. Filling a login injects a script into one page at the moment you ask, rather than giving every page a permanent bridge.
+The password vault never stores the master password, only a separate scrypt derivation used to check it, and holds the encryption key in memory for exactly as long as you are signed in. Filling a login injects a script into one page, gated on the vault holding a credential for that exact host, rather than giving every page a permanent bridge.
 
 **Never commit tokens, keys or credentials.** `.gitignore` covers `.env*` and key material. Publishing uses the `GITHUB_TOKEN` that Actions injects automatically — no personal access token is needed anywhere in this project.
 
 ## Design notes
+
+A `WebContentsView` always paints above the window's own web contents, so anything the chrome renderer draws inside the content region is behind the page. The palette, settings and privacy panels answer that by hiding the page while they are up — they own the whole region anyway. The downloads bubble cannot: it appears on its own when a file lands, and blanking the page you were reading to announce a download would be absurd. So it is its own `WebContentsView`, loading the same renderer at `#downloads`, trimmed to the height the card actually draws at. Every pixel outside those few hundred still belongs to the page.
 
 One spacing unit is 8px (`--spacing: 0.5rem`), so every integer Tailwind spacing utility lands on the grid by construction rather than by convention. The Instagram gradient is defined once as `--vela-gradient` and appears in exactly two places: the active tab indicator and focus rings. Fonts are the system stack — no CDN, no Google Fonts, no request you didn't ask for. Dark mode follows the OS by default and is overridable in settings.
 

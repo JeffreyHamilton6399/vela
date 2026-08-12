@@ -1,18 +1,31 @@
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, session as electronSession, shell, type Session } from 'electron';
+import {
+  BrowserWindow,
+  session as electronSession,
+  shell,
+  type ContextMenuParams,
+  type Session,
+  type WebContents,
+} from 'electron';
 import { EVENT_CHANNELS, type BrowserState, type WindowState } from '../shared/types/ipc.js';
 import type { Platform } from '../shared/types/ipc.js';
 import type { SettingsStore } from './settings/store.js';
 import type { Workspace } from '../shared/settings.js';
 import type { BlockerHandle } from './privacy/adblock.js';
+import type { BrowserIdentity } from './privacy/policies.js';
 import type { FaviconCache } from './favicons/favicon-cache.js';
 import type { HistoryStore } from './history/history-store.js';
 import { DownloadManager } from './downloads/download-manager.js';
+import { DownloadPopup } from './downloads/download-popup.js';
 import { PanelManager } from './panels/panel-manager.js';
 import { hardenSession } from './privacy/session-hardening.js';
 import { createWindowOptions } from './window-options.js';
 import { readWindowState } from './ipc/register-window-ipc.js';
+import { popupPageMenu } from './menus/page-menu.js';
 import { TabManager } from './tabs/tab-manager.js';
+import type { Tab } from './tabs/tab.js';
+import type { Vault } from './account/vault.js';
+import { fillLogin, watchForLogin, FORM_WAIT_MS } from './account/autofill.js';
 
 export interface VelaWindowOptions {
   platform: Platform;
@@ -22,12 +35,15 @@ export interface VelaWindowOptions {
   backgroundColor: string;
   iconPath: string;
   userAgent: string;
+  /** Platform and Chromium version, shared by the UA and the client hints. */
+  identity: BrowserIdentity;
   isDev: boolean;
   isPrivate: boolean;
   settings: SettingsStore;
   blocker: BlockerHandle | null;
   favicons: FaviconCache | null;
   history: HistoryStore | null;
+  vault: Vault | null;
   onClosed: (window: VelaWindow) => void;
   onUnexpectedRequest: (url: string) => void;
 }
@@ -53,10 +69,23 @@ export class VelaWindow {
   readonly session: Session;
   readonly isPrivate: boolean;
   readonly downloads: DownloadManager;
+  readonly downloadPopup: DownloadPopup;
   readonly panels: PanelManager;
 
   private blockedTotal = 0;
   private readonly disposers: (() => void)[] = [];
+
+  /**
+   * Logins Vela has seen typed but not been told what to do with.
+   *
+   * The password lives here rather than travelling to the chrome renderer with
+   * the prompt: the renderer only ever learns the host and the username, and
+   * answers by id.
+   */
+  private readonly pendingCaptures = new Map<
+    string,
+    { host: string; username: string; password: string }
+  >();
 
   constructor(private readonly options: VelaWindowOptions) {
     this.isPrivate = options.isPrivate;
@@ -69,6 +98,7 @@ export class VelaWindow {
 
     hardenSession(this.session, {
       userAgent: options.userAgent,
+      identity: options.identity,
       isDev: options.isDev,
       stripReferer: () => options.settings.current.stripCrossOriginReferer,
       onUnexpectedRequest: options.onUnexpectedRequest,
@@ -83,8 +113,24 @@ export class VelaWindow {
       }),
     );
 
-    this.downloads = new DownloadManager(this.session, (items) => {
-      this.send(EVENT_CHANNELS.downloadsChanged, items);
+    this.downloadPopup = new DownloadPopup({
+      window: this.window,
+      preloadPath: options.preloadPath,
+      rendererHtml: options.rendererHtml,
+      devServerUrl: options.devServerUrl,
+      // Read lazily: the tab manager below is what knows the page's rectangle.
+      getContentBounds: () => this.manager.contentBounds,
+    });
+
+    this.downloads = new DownloadManager(this.session, {
+      onChanged: (items) => {
+        this.send(EVENT_CHANNELS.downloadsChanged, items);
+      },
+      // What a browser normally does: the bubble appears by itself when a
+      // download starts and again when it lands, and withdraws on its own.
+      onNotable: () => {
+        this.downloadPopup.show({ autoHide: true });
+      },
     });
 
     this.manager = new TabManager({
@@ -116,10 +162,21 @@ export class VelaWindow {
         if (options.isPrivate || !options.settings.current.keepHistory) return;
         options.history?.record(url, title);
       },
+      onPageReady: (tab) => {
+        this.autofillLogin(tab);
+        this.watchForLoginToSave(tab);
+      },
+      onPageContextMenu: (tab, params) => {
+        const contents = tab.webContents;
+        if (contents !== null) this.showPageMenu(contents, params, tab.id);
+      },
       // Read through Object.entries rather than by index: a host is arbitrary
       // text from a page and never indexes into an object Vela owns.
       getZoomForHost: (host) =>
         Object.entries(options.settings.current.zoomLevels).find(([key]) => key === host)?.[1] ?? 0,
+      onContentBounds: () => {
+        this.downloadPopup.reposition();
+      },
       setZoomForHost: (host, level) => {
         // Rebuilt rather than mutated: a host is arbitrary text from a page,
         // so it never indexes into an object Vela owns.
@@ -138,6 +195,9 @@ export class VelaWindow {
       session: this.session,
       onOpenInTab: (url) => {
         this.manager.create({ url, active: true });
+      },
+      onContextMenu: (contents, params) => {
+        this.showPageMenu(contents, params);
       },
       onFavicon: (id, pageUrl, iconUrl) => {
         // Same rule as tabs: the icon is cached locally and only ever handed
@@ -180,13 +240,20 @@ export class VelaWindow {
     return this.manager.state;
   }
 
+  /**
+   * The renderers that are Vela's own chrome, and so may speak over IPC. The
+   * downloads bubble is one of them: it is the same UI, in its own view only
+   * because the page paints above the window's web contents.
+   */
   owns(sender: unknown): boolean {
-    return !this.window.isDestroyed() && sender === this.window.webContents;
+    if (this.window.isDestroyed()) return false;
+    return sender === this.window.webContents || this.downloadPopup.owns(sender);
   }
 
   send(channel: string, payload: unknown): void {
     if (this.window.isDestroyed() || this.window.webContents.isDestroyed()) return;
     this.window.webContents.send(channel, payload);
+    this.downloadPopup.webContents?.send(channel, payload);
   }
 
   broadcastWindowState(): void {
@@ -195,6 +262,134 @@ export class VelaWindow {
   }
 
   /* ----------------------------------------------------------------- */
+
+  /**
+   * The context menu for web content, shared by tabs and docked panels — a
+   * right-click means the same thing in both, because both are pages.
+   *
+   * `openerId` is the tab a link should open beside; a panel has none, so its
+   * links land at the end of the strip.
+   */
+  private showPageMenu(contents: WebContents, params: ContextMenuParams, openerId?: string): void {
+    popupPageMenu({
+      window: this.window,
+      contents,
+      params,
+      openInNewTab: (url) => {
+        this.manager.create(
+          openerId === undefined ? { url, active: true } : { url, active: true, openerId },
+        );
+      },
+      searchEngineId: () => this.options.settings.current.searchEngineId,
+      isDev: this.options.isDev,
+    });
+  }
+
+  /**
+   * Fills a saved login as the page arrives.
+   *
+   * Every condition here is a gate on injecting anything at all: the setting
+   * has to be on, the vault has to be unlocked, and the vault has to already
+   * hold a credential for this exact host. A site you have never saved a
+   * password for fails the third check and receives no script — which is what
+   * keeps "Vela's tabs carry no bridge" true for the web at large while still
+   * getting you into the handful of sites you actually sign in to.
+   */
+  private autofillLogin(tab: Tab): void {
+    const { vault, settings } = this.options;
+    const mode = settings.current.loginAutofill;
+    if (vault === null || mode === 'off' || !vault.unlocked) return;
+
+    const contents = tab.webContents;
+    if (contents === null) return;
+
+    let host: string;
+    try {
+      host = new URL(tab.url).host;
+    } catch {
+      return;
+    }
+    if (host === '') return;
+
+    const entry = vault.findForHost(host);
+    if (entry === null) return;
+
+    const password = vault.reveal(entry.id);
+    // eslint-disable-next-line security/detect-possible-timing-attacks -- a null check on our own decrypt result, not a secret comparison
+    if (password === null) return;
+
+    void fillLogin(contents, {
+      username: entry.username,
+      password,
+      // Never overwrite what someone is part-way through typing.
+      force: false,
+      submit: mode === 'submit',
+      waitMs: FORM_WAIT_MS,
+    });
+  }
+
+  /**
+   * Watches a page for a login being typed, so Vela can offer to remember it.
+   *
+   * This is the injection that reaches sites Vela holds nothing for, which is
+   * the price of ever learning a first password without the user copying it
+   * into Settings by hand. It is gated on the vault being unlocked and on the
+   * setting, and the script it injects reads nothing until a login is actually
+   * submitted.
+   */
+  private watchForLoginToSave(tab: Tab): void {
+    const { vault, settings } = this.options;
+    if (vault === null || !settings.current.offerToSaveLogins || !vault.unlocked) return;
+
+    const contents = tab.webContents;
+    if (contents === null) return;
+
+    let host: string;
+    try {
+      host = new URL(tab.url).host;
+    } catch {
+      return;
+    }
+    if (host === '') return;
+
+    void watchForLogin(contents).then((captured) => {
+      if (captured === null || !vault.unlocked) return;
+
+      // Nothing to offer when this is exactly what is already stored.
+      const existing = vault.findForHost(host);
+      const sameEntry = existing !== null && existing.username === captured.username;
+      if (sameEntry && vault.reveal(existing.id) === captured.password) return;
+
+      const id = randomUUID();
+      this.pendingCaptures.set(id, {
+        host,
+        username: captured.username,
+        password: captured.password,
+      });
+      this.send(EVENT_CHANNELS.loginCaptured, {
+        id,
+        host,
+        username: captured.username,
+        replacing: sameEntry,
+      });
+    });
+  }
+
+  /** Stores or discards a captured login the user has now answered for. */
+  resolveCapture(id: string, save: boolean): { ok: boolean; error: string | null } {
+    const pending = this.pendingCaptures.get(id);
+    this.pendingCaptures.delete(id);
+
+    if (pending === undefined) return { ok: false, error: 'That prompt has already gone.' };
+    if (!save) return { ok: true, error: null };
+
+    const { vault } = this.options;
+    if (vault?.unlocked !== true) return { ok: false, error: 'Sign in first.' };
+
+    return vault.save(pending.host, pending.username, pending.password)
+      ? { ok: true, error: null }
+      : { ok: false, error: 'Could not save that login.' };
+  }
 
   /**
    * Routes this session through whatever proxy the user configured. Vela runs
@@ -297,6 +492,7 @@ export class VelaWindow {
     this.disposers.length = 0;
     this.manager.dispose();
     this.downloads.dispose();
+    this.downloadPopup.dispose();
     this.panels.dispose();
 
     if (this.isPrivate) {

@@ -342,8 +342,8 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
                     }}
                   />
                   <Toggle
-                    label="Strip cross-origin Referer"
-                    description="Do not tell a site which other site you came from. Same-origin referers are kept, since they leak nothing new."
+                    label="Trim cross-origin Referer"
+                    description="Tell another site only which site you came from, never which page. Same-origin referers are kept whole, since they leak nothing new."
                     checked={settings.stripCrossOriginReferer}
                     onChange={(next) => {
                       set({ stripCrossOriginReferer: next });
@@ -400,9 +400,53 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
               ) : null}
 
               {category === 'account' ? (
-                <Section title="Vela account">
-                  <AccountSection />
-                </Section>
+                <>
+                  <Section title="Vela account">
+                    <AccountSection />
+                  </Section>
+
+                  <Section title="Signing in to websites">
+                    <label className="flex items-center justify-between gap-2 px-1 py-1">
+                      <span className="min-w-0 text-[13px] text-ink">
+                        When you open a site you have saved
+                        <span className="block text-[12px] leading-relaxed text-ink-muted">
+                          Only sites in your vault. A site you have never saved a password for gets
+                          nothing from Vela, whichever setting this is on.
+                        </span>
+                      </span>
+                      <select
+                        value={settings.loginAutofill}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (value === 'off' || value === 'fill' || value === 'submit') {
+                            set({ loginAutofill: value });
+                          }
+                        }}
+                        className="focus-ring shrink-0 rounded-lg border border-line bg-raised px-1 py-1 text-[13px] text-ink outline-none"
+                      >
+                        <option value="off">Do nothing</option>
+                        <option value="fill">Fill the login</option>
+                        <option value="submit">Fill it and sign in</option>
+                      </select>
+                    </label>
+
+                    <p className="px-1 pb-1 text-[12px] leading-relaxed text-ink-muted">
+                      “Fill it and sign in” presses the login button for you, which is the only
+                      setting that gets you through a sign-in without touching anything. It stops
+                      where a site does: a second factor, a code from your phone, or a “was this
+                      you?” prompt is still yours to answer.
+                    </p>
+
+                    <Toggle
+                      label="Offer to save logins you type"
+                      description="The one setting that widens where Vela injects: to notice a login on a site you have not saved yet, it has to watch pages it holds nothing for. The watcher reads nothing until a login is submitted, and runs nowhere while you are signed out of Vela."
+                      checked={settings.offerToSaveLogins}
+                      onChange={(next) => {
+                        set({ offerToSaveLogins: next });
+                      }}
+                    />
+                  </Section>
+                </>
               ) : null}
 
               {category === 'assistant' ? (

@@ -35,7 +35,16 @@ export interface SettingsIpcDeps extends GuardOptions {
   cachedFavicon: (url: string) => string | null;
   vault: Vault;
   /** Fills the saved login into the page of a tab the user is looking at. */
-  fillLogin: (sender: unknown, tabId: string) => Promise<{ ok: boolean; error: string | null; filled: number }>;
+  fillLogin: (
+    sender: unknown,
+    tabId: string,
+  ) => Promise<{ ok: boolean; error: string | null; filled: number }>;
+  /** Answers a "save this login?" prompt for the window that raised it. */
+  resolveCapture: (
+    sender: unknown,
+    id: string,
+    save: boolean,
+  ) => { ok: boolean; error: string | null };
   /** Opens Ollama's download page. Vela never runs an installer itself. */
   openOllamaDownload: (sender: unknown) => { opened: boolean; command: string };
   downloads: {
@@ -44,6 +53,9 @@ export interface SettingsIpcDeps extends GuardOptions {
     showInFolder: (sender: unknown, id: string) => void;
     cancel: (sender: unknown, id: string) => void;
     clear: (sender: unknown) => void;
+    togglePopup: (sender: unknown) => void;
+    closePopup: (sender: unknown) => void;
+    setPopupHeight: (sender: unknown, height: number) => void;
   };
   history: {
     search: (query: string, limit: number) => HistoryEntry[];
@@ -131,6 +143,10 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
     deps.fillLogin(sender, tabId),
   );
 
+  handleInvoke(deps, INVOKE_CHANNELS.vaultResolveCapture, ({ id, save }, sender) =>
+    deps.resolveCapture(sender, id, save),
+  );
+
   handleInvoke(deps, INVOKE_CHANNELS.assistantInstall, (_payload, sender) =>
     deps.openOllamaDownload(sender),
   );
@@ -194,6 +210,18 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
 
   handleSend(deps, SEND_CHANNELS.downloadsClear, (_payload, sender) => {
     deps.downloads.clear(sender);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsPopupToggle, (_payload, sender) => {
+    deps.downloads.togglePopup(sender);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsPopupClose, (_payload, sender) => {
+    deps.downloads.closePopup(sender);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsPopupHeight, ({ height }, sender) => {
+    deps.downloads.setPopupHeight(sender, height);
   });
 
   handleSend(deps, SEND_CHANNELS.bookmarksAdd, ({ url, title }) => {

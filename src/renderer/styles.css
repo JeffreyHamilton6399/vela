@@ -62,9 +62,54 @@
     cursor: default;
   }
 
+  /*
+   * The downloads bubble is the same renderer in its own view, sized to the
+   * card and floating over the page. Its background has to be nothing at all,
+   * or the card's rounded corners sit on a square of Vela's surface colour.
+   */
+  html[data-surface='transparent'],
+  html[data-surface='transparent'] body {
+    background-color: transparent;
+  }
+
   /* No native focus ring anywhere; the gradient ring below replaces it. */
   :focus-visible {
     outline: none;
+  }
+
+  /*
+   * Thin, quiet scrollbars.
+   *
+   * The chrome's own panels — settings, the sidebar, the new tab page — were
+   * drawing the platform's full-width scrollbar, which is the single loudest
+   * thing in the window and sits right against the page content. This is the
+   * same track, 8px wide, with no arrows and no background until you are
+   * actually over it. Web content is untouched: a page's scrollbar is the
+   * page's business.
+   */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
+    border-radius: 999px;
+    /* Inset from the edge so the thumb reads as floating, not as a gutter. */
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--color-ink) 32%, transparent);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 
@@ -88,6 +133,37 @@
 @media (prefers-reduced-motion: reduce) {
   .workspace-enter {
     animation: none;
+  }
+}
+
+/*
+ * The press. Every control in the chrome dips very slightly under the pointer
+ * and springs back, which is most of what makes an interface feel responsive
+ * rather than merely fast: the answer arrives on the button press instead of
+ * when the work finishes.
+ *
+ * 90ms, because a press wants to feel immediate where a transition wants to
+ * feel smooth.
+ */
+@utility press {
+  transition:
+    transform 90ms var(--ease-spring),
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+
+  &:active:not(:disabled) {
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press {
+    transition: none;
+  }
+
+  .press:active:not(:disabled) {
+    transform: none;
   }
 }
 

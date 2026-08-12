@@ -74,6 +74,24 @@ export const vaultEntrySchema = z.object({
 });
 export type VaultEntry = z.infer<typeof vaultEntrySchema>;
 
+/**
+ * A login Vela saw someone type, offered back for saving.
+ *
+ * The password is deliberately absent. It stays in the main process against
+ * `id` until the user answers, so the chrome renderer — which draws the prompt
+ * — never holds a secret it has no reason to hold.
+ */
+export const capturedLoginSchema = z
+  .object({
+    id: z.string(),
+    host: z.string(),
+    username: z.string(),
+    /** True when a credential for this host already exists with another password. */
+    replacing: z.boolean(),
+  })
+  .nullable();
+export type CapturedLogin = z.infer<typeof capturedLoginSchema>;
+
 export const actionResultSchema = z.object({ ok: z.boolean(), error: z.string().nullable() });
 export type ActionResult = z.infer<typeof actionResultSchema>;
 
@@ -230,6 +248,7 @@ export const INVOKE_CHANNELS = {
   vaultSave: 'vault:save',
   vaultRemove: 'vault:remove',
   vaultFill: 'vault:fill',
+  vaultResolveCapture: 'vault:resolve-capture',
   privacyGetReport: 'privacy:get-report',
   privacyClearData: 'privacy:clear-data',
 } as const;
@@ -266,6 +285,9 @@ export const SEND_CHANNELS = {
   downloadsShow: 'downloads:show',
   downloadsCancel: 'downloads:cancel',
   downloadsClear: 'downloads:clear',
+  downloadsPopupToggle: 'downloads:popup-toggle',
+  downloadsPopupClose: 'downloads:popup-close',
+  downloadsPopupHeight: 'downloads:popup-height',
   bookmarksAdd: 'bookmarks:add',
   bookmarksRemove: 'bookmarks:remove',
   bookmarksMove: 'bookmarks:move',
@@ -293,6 +315,7 @@ export const EVENT_CHANNELS = {
   settingsChanged: 'settings:changed',
   updateStateChanged: 'updates:state-changed',
   downloadsChanged: 'downloads:changed',
+  loginCaptured: 'account:login-captured',
 } as const;
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNELS];
@@ -331,11 +354,14 @@ export const invokeContract = {
   },
   [INVOKE_CHANNELS.accountLock]: { request: emptySchema, response: z.boolean() },
   [INVOKE_CHANNELS.vaultList]: { request: emptySchema, response: z.array(vaultEntrySchema) },
-  [INVOKE_CHANNELS.vaultSave]: { request: z.object({
+  [INVOKE_CHANNELS.vaultSave]: {
+    request: z.object({
       host: z.string().min(1).max(255),
       username: z.string().max(255),
       password: z.string().max(500),
-    }), response: actionResultSchema },
+    }),
+    response: actionResultSchema,
+  },
   [INVOKE_CHANNELS.vaultRemove]: {
     request: z.object({ id: z.string().max(600) }),
     response: z.boolean(),
@@ -343,6 +369,11 @@ export const invokeContract = {
   [INVOKE_CHANNELS.vaultFill]: {
     request: z.object({ tabId: tabIdString }),
     response: z.object({ ok: z.boolean(), error: z.string().nullable(), filled: z.number() }),
+  },
+  [INVOKE_CHANNELS.vaultResolveCapture]: {
+    // `save: false` discards the pending credential rather than storing it.
+    request: z.object({ id: z.string().max(600), save: z.boolean() }),
+    response: actionResultSchema,
   },
   [INVOKE_CHANNELS.assistantInstall]: {
     request: emptySchema,
@@ -392,6 +423,11 @@ export const sendContract = {
   [SEND_CHANNELS.downloadsShow]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.downloadsCancel]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.downloadsClear]: emptySchema,
+  [SEND_CHANNELS.downloadsPopupToggle]: emptySchema,
+  [SEND_CHANNELS.downloadsPopupClose]: emptySchema,
+  // The bubble measures itself and main resizes its view to match, so the
+  // rectangle that covers the page is never larger than the card drawn in it.
+  [SEND_CHANNELS.downloadsPopupHeight]: z.object({ height: z.number().int().min(0).max(2000) }),
   [SEND_CHANNELS.bookmarksAdd]: z.object({ url: addressString, title: z.string().max(200) }),
   [SEND_CHANNELS.bookmarksRemove]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.bookmarksMove]: z.object({ id: tabIdString, toIndex: z.number().int().min(0) }),
@@ -425,6 +461,7 @@ export const eventContract = {
   [EVENT_CHANNELS.settingsChanged]: settingsSchema,
   [EVENT_CHANNELS.updateStateChanged]: updateStateSchema,
   [EVENT_CHANNELS.downloadsChanged]: z.array(downloadItemSchema),
+  [EVENT_CHANNELS.loginCaptured]: capturedLoginSchema,
 } as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.infer<(typeof invokeContract)[C]['request']>;
@@ -515,6 +552,12 @@ export interface VelaBridge {
     cancel(id: string): void;
     clear(): void;
     onChanged(listener: (items: DownloadItem[]) => void): () => void;
+    /** Shows or hides the bubble that floats over the page's top-right corner. */
+    togglePopup(): void;
+    /** Called from inside the bubble to dismiss itself. */
+    closePopup(): void;
+    /** Reports the bubble's drawn height so main can size the view to it. */
+    reportPopupHeight(height: number): void;
   };
   readonly account: {
     state(): Promise<AccountState>;
@@ -527,6 +570,13 @@ export interface VelaBridge {
     remove(id: string): Promise<boolean>;
     /** Fills the saved login into the page in this tab, when asked. */
     fill(tabId: string): Promise<{ ok: boolean; error: string | null; filled: number }>;
+    /**
+     * Answers a "save this login?" prompt. The password never came to the
+     * renderer, so this stores or discards the one main is holding under `id`.
+     */
+    resolveCapture(id: string, save: boolean): Promise<ActionResult>;
+    /** Fires with a captured login to offer, or null to withdraw the offer. */
+    onCaptured(listener: (captured: CapturedLogin) => void): () => void;
   };
   readonly assistant: {
     /** Uses the key in the local settings file; there is no shipped key. */
