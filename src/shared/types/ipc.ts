@@ -182,6 +182,11 @@ export const tabSnapshotSchema = z.object({
   /** Set when an https upgrade failed and Vela is warning before plain http. */
   interstitialUrl: z.string().nullable(),
   blockedCount: z.number().int().nonnegative(),
+  /**
+   * Whose sign-in has refused this browser, if one just has. Not a failure of
+   * the password — a judgement about what Vela is.
+   */
+  signInRejectedBy: z.string().nullable(),
 });
 export type TabSnapshot = z.infer<typeof tabSnapshotSchema>;
 
@@ -276,6 +281,8 @@ export const SEND_CHANNELS = {
   tabsShowNewTab: 'tabs:show-newtab',
   tabsCloseOthers: 'tabs:close-others',
   tabsDuplicate: 'tabs:duplicate',
+  tabsDismissRejection: 'tabs:dismiss-rejection',
+  tabsOpenExternally: 'tabs:open-externally',
   menuTab: 'menu:tab',
   workspacesCreate: 'workspaces:create',
   workspacesRename: 'workspaces:rename',
@@ -421,6 +428,10 @@ export const sendContract = {
   [SEND_CHANNELS.tabsShowNewTab]: tabRefSchema,
   [SEND_CHANNELS.tabsCloseOthers]: tabRefSchema,
   [SEND_CHANNELS.tabsDuplicate]: tabRefSchema,
+  [SEND_CHANNELS.tabsDismissRejection]: tabRefSchema,
+  // Hands the page to whatever browser the machine already trusts. https only:
+  // this opens something outside Vela, so the scheme is not up for negotiation.
+  [SEND_CHANNELS.tabsOpenExternally]: tabRefSchema,
   [SEND_CHANNELS.menuTab]: tabRefSchema,
   [SEND_CHANNELS.workspacesCreate]: z.object({ name: z.string().min(1).max(60) }),
   [SEND_CHANNELS.workspacesRename]: z.object({ id: tabIdString, name: z.string().min(1).max(60) }),
@@ -543,6 +554,10 @@ export interface VelaBridge {
     openContextMenu(id: string): void;
     /** Accepts the plain-http interstitial for this tab's host. */
     continueInsecure(id: string): void;
+    /** Puts away the "this site refused Vela" notice without leaving the page. */
+    dismissRejection(id: string): void;
+    /** Hands this tab's address to the machine's default browser. */
+    openExternally(id: string): void;
     onStateChanged(listener: (state: BrowserState) => void): () => void;
   };
   readonly workspaces: {

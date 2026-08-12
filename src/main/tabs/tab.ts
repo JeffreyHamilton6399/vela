@@ -8,6 +8,7 @@ import type { TabSnapshot } from '../../shared/types/ipc.js';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
 import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
 import { allowPopup, isPopupDisposition } from './popup-window.js';
+import { detectSignInRejection } from './rejection.js';
 
 export interface TabEvents {
   /** Any change worth redrawing the tab strip for. */
@@ -72,6 +73,8 @@ export class Tab {
   private hasLoadedPage = false;
   /** The plain-http address being warned about, if any. */
   private interstitialUrl: string | null = null;
+  /** Set when a site has just refused to sign in because of what Vela is. */
+  private rejectedBy: string | null = null;
   private title = 'New Tab';
   private faviconUrl: string | null = null;
   private loading = false;
@@ -185,6 +188,7 @@ export class Tab {
       zoomPercent: this.zoomPercent,
       workspaceId: this.workspaceId,
       blockedCount: this.blocked,
+      signInRejectedBy: internal ? null : this.rejectedBy,
     };
   }
 
@@ -324,6 +328,21 @@ export class Tab {
     if (view !== null && !view.webContents.isDestroyed()) view.webContents.close();
   }
 
+  /**
+   * Records a site refusing this browser, and clears the record the moment the
+   * tab is anywhere else — the notice belongs to that page, not to the tab.
+   */
+  private noteRejection(url: string): void {
+    this.rejectedBy = detectSignInRejection(url)?.service ?? null;
+  }
+
+  /** Dismisses the notice without leaving the page it is about. */
+  dismissRejection(): void {
+    if (this.rejectedBy === null) return;
+    this.rejectedBy = null;
+    this.changed();
+  }
+
   private changed(): void {
     this.events.onChanged(this);
   }
@@ -391,6 +410,7 @@ export class Tab {
 
     contents.on('did-navigate', (_event, url) => {
       this.currentUrl = url;
+      this.noteRejection(url);
       this.changed();
       this.events.onNavigated(this);
     });
@@ -403,9 +423,12 @@ export class Tab {
       this.events.onContextMenu(this, params);
     });
 
+    // Google's refusal arrives as an in-page navigation, so watching only the
+    // full ones would never see it.
     contents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
       if (!isMainFrame) return;
       this.currentUrl = url;
+      this.noteRejection(url);
       this.changed();
     });
 

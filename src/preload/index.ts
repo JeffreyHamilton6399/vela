@@ -136,6 +136,12 @@ const bridge: VelaBridge = {
     continueInsecure(id: string): void {
       ipcRenderer.send(SEND_CHANNELS.tabsContinueInsecure, { id });
     },
+    dismissRejection(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.tabsDismissRejection, { id });
+    },
+    openExternally(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.tabsOpenExternally, { id });
+    },
     onStateChanged(listener: (state: BrowserState) => void): () => void {
       const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
         const parsed = browserStateSchema.safeParse(payload);

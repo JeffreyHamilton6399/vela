@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { BrowserWindow, ContextMenuParams, Session } from 'electron';
+import { shell, type BrowserWindow, type ContextMenuParams, type Session } from 'electron';
 import type { BrowserState } from '../../shared/types/ipc.js';
 import type { Workspace } from '../../shared/settings.js';
 import { resolveAddressInput } from '../../shared/address-input.js';
@@ -173,6 +173,20 @@ export class TabManager {
     tab.countBlocked(1);
     this.notify();
     return true;
+  }
+
+  /**
+   * Hands a tab's address to the machine's default browser.
+   *
+   * The escape hatch for a site that will not accept Vela: the page opens
+   * somewhere it is accepted rather than nowhere at all. https only — this
+   * leaves Vela's process entirely, so the scheme is not negotiable.
+   */
+  openExternally(id: string): void {
+    const tab = this.find(id);
+    if (tab === null) return;
+    if (!tab.url.startsWith('https://')) return;
+    void shell.openExternal(tab.url);
   }
 
   /** Accepts the plain-http warning for this tab's host and loads the page. */

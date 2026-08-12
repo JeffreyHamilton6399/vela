@@ -14,6 +14,7 @@ import type { SidebarTool } from './components/Sidebar.js';
 import { TitleBar } from './components/TitleBar.js';
 import { WorkspaceRail } from './components/WorkspaceRail.js';
 import { Toolbar } from './components/Toolbar.js';
+import { SignInRejectedBanner } from './components/SignInRejectedBanner.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
 import { SaveLoginPrompt, useCapturedLogin } from './components/SaveLoginPrompt.js';
 import { CloseIcon, DownloadIcon } from './components/icons.js';
@@ -172,6 +173,8 @@ export function App(): JSX.Element {
       ) : null}
 
       <UpdateBanner state={update} />
+
+      <SignInRejectedBanner tab={tab} />
 
       <SaveLoginPrompt
         captured={captured}

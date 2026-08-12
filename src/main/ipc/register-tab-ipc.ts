@@ -138,6 +138,18 @@ export function registerTabIpc(deps: TabIpcDeps): void {
     });
   });
 
+  handleSend(deps, SEND_CHANNELS.tabsDismissRejection, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.find(id)?.dismissRejection();
+    });
+  });
+
+  handleSend(deps, SEND_CHANNELS.tabsOpenExternally, ({ id }, sender) => {
+    withManager(deps, sender, (manager) => {
+      manager.openExternally(id);
+    });
+  });
+
   handleSend(deps, SEND_CHANNELS.workspacesCreate, ({ name }, sender) => {
     withManager(deps, sender, (manager) => {
       manager.createWorkspace(name);
