@@ -244,6 +244,11 @@ export class Tab {
     return this.interstitialUrl;
   }
 
+  /** Whose sign-in has refused this browser on the page now showing, if any. */
+  get signInRejectedBy(): string | null {
+    return this.rejectedBy;
+  }
+
   /** The inverse of `showNewTabPage`: reveals the page that is still loaded. */
   private resumePage(): void {
     if (!this.hasLoadedPage) return;

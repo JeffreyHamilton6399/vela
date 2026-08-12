@@ -14,6 +14,7 @@ import {
 import { indexOfTab, insertTab, moveTab, nextActiveId, removeTab, setPinned } from './tab-order.js';
 import { selectTabsToSuspend } from './suspension.js';
 import { configurePopup } from './popup-window.js';
+import { externalUrlForRejection } from './rejection.js';
 import { Tab } from './tab.js';
 
 export interface CreateTabOptions {
@@ -186,7 +187,12 @@ export class TabManager {
     const tab = this.find(id);
     if (tab === null) return;
     if (!tab.url.startsWith('https://')) return;
-    void shell.openExternal(tab.url);
+
+    // On a refusal page, the address itself is not what to hand over: its
+    // query is single-use and another browser gets a 400 for it.
+    const target =
+      tab.signInRejectedBy === null ? tab.url : (externalUrlForRejection(tab.url) ?? tab.url);
+    void shell.openExternal(target);
   }
 
   /** Accepts the plain-http warning for this tab's host and loads the page. */

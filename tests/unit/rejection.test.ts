@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectSignInRejection } from '../../src/main/tabs/rejection.js';
+import { detectSignInRejection, externalUrlForRejection } from '../../src/main/tabs/rejection.js';
 
 describe('detectSignInRejection', () => {
   /** The exact URL Google sent a Vela tab back to, captured from a real run. */
@@ -42,5 +42,35 @@ describe('detectSignInRejection', () => {
   it('passes anything unparseable through as no rejection', () => {
     expect(detectSignInRejection('')).toBeNull();
     expect(detectSignInRejection('not a url')).toBeNull();
+  });
+});
+
+describe('externalUrlForRejection', () => {
+  /**
+   * The refusal page's query is single-use and session-bound. Handing it to
+   * another browser earns a bare "400. That's an error." — a worse dead end
+   * than the one the button exists to escape.
+   */
+  it('does not hand over the single-use query that earns a 400', () => {
+    const rejected =
+      'https://accounts.google.com/v3/signin/rejected?dsh=S-31457267%3A1786544458418872&epd=AVqPwHi&rhlk=le&rrk=46';
+    const target = externalUrlForRejection(rejected);
+
+    expect(target).toBe('https://accounts.google.com/');
+    expect(target).not.toContain('dsh');
+    expect(target).not.toContain('epd');
+    expect(target).not.toContain('?');
+  });
+
+  it('sends an OAuth refusal back to the application, not to its callback', () => {
+    expect(
+      externalUrlForRejection('https://app.example/auth/callback?error=disallowed_useragent'),
+    ).toBe('https://app.example/');
+  });
+
+  it('refuses to hand over anything that is not https', () => {
+    expect(externalUrlForRejection('http://accounts.google.com/signin/rejected')).toBeNull();
+    expect(externalUrlForRejection('file:///etc/passwd')).toBeNull();
+    expect(externalUrlForRejection('not a url')).toBeNull();
   });
 });
