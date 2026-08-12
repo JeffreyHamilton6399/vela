@@ -83,43 +83,89 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         margin: 40px 0 8px;
       }
 
-      .primary {
-        display: inline-block;
-        padding: 14px 28px;
-        border-radius: 999px;
-        background: var(--ink);
-        color: var(--surface);
-        font-size: 16px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: opacity 0.15s ease;
-      }
-
-      .primary:hover {
-        opacity: 0.9;
-      }
-
-      .others {
+      /*
+       * Every download is the same button. `1fr` columns rather than
+       * content-width ones, so a long label and a short one come out identical
+       * — which build you need is not a reason for one target to be harder to
+       * hit than another. The row count falls from three to one as the window
+       * narrows; nothing overflows.
+       */
+      /*
+       * Flex rather than grid, because of the last row. Grid items align to
+       * their columns, so five buttons in rows of three leave the final two
+       * hanging off to the left however the tracks are justified. Wrapped flex
+       * lines centre individually, and a fixed basis keeps every button the
+       * same width regardless of which line it lands on.
+       */
+      .download-grid {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 16px;
-        font-size: 14px;
+        gap: 10px;
+        width: 100%;
+        max-width: 700px;
       }
 
-      .others a {
-        color: var(--ink-muted);
+      .dl {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        /* Neither grows nor shrinks: identical boxes are the point. The
+           max-width is the escape hatch for a viewport narrower than one. */
+        flex: 0 0 220px;
+        max-width: 100%;
+        min-height: 52px;
+        padding: 12px 18px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--ink);
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.25;
+        text-align: center;
+        text-decoration: none;
+        /* One line always: a label that wrapped would make its button taller
+           than the rest of the row, which is the whole thing being avoided. */
+        white-space: nowrap;
+        transition:
+          opacity 0.15s ease,
+          border-color 0.15s ease;
       }
 
-      /* A platform the current release has no build for. Not a link, because
-         there is nothing yet to link to. */
-      .others .pending {
+      .dl:hover {
+        border-color: var(--ink);
+      }
+
+      /* The build this visitor is most likely to want. Emphasis is colour
+         only — it is exactly the same size as the rest. */
+      .dl.is-primary {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--surface);
+      }
+
+      .dl.is-primary:hover {
+        opacity: 0.9;
+      }
+
+      /* A platform the current release has no build for. Same box, but not a
+         link, because there is nothing yet to link to. */
+      .dl.pending {
+        opacity: 0.5;
+        font-weight: 500;
+      }
+
+      .download-note {
+        margin: 0;
         color: var(--ink-muted);
-        opacity: 0.65;
+        font-size: 13px;
+        text-align: center;
       }
 
       section {
@@ -200,14 +246,17 @@
         <p class="tagline">A browser that collects nothing. Not “less” — nothing.</p>
 
         <div class="download">
-          <a
-            class="primary"
-            id="primary-download"
-            href="https://github.com/JeffreyHamilton6399/vela/releases/latest"
-          >
-            Download for your computer
-          </a>
-          <div class="others" id="other-downloads"></div>
+          <div class="download-grid" id="downloads">
+            <!-- Replaced below with one button per build. Left as a working
+                 link so the page still downloads something with no script. -->
+            <a
+              class="dl is-primary"
+              href="https://github.com/JeffreyHamilton6399/vela/releases/latest"
+            >
+              Download Vela
+            </a>
+          </div>
+          <p class="download-note" id="download-note"></p>
         </div>
       </header>
 
@@ -362,12 +411,12 @@
               {
                 arch: 'x64',
                 file: asset('windows', 'x64', 'exe'),
-                note: 'Windows · Intel/AMD 64-bit (.exe)',
+                note: 'Windows 64-bit · .exe',
               },
               {
                 arch: 'arm64',
                 file: asset('windows', 'arm64', 'exe'),
-                note: 'Windows · ARM64 (.exe)',
+                note: 'Windows ARM64 · .exe',
               },
             ],
           },
@@ -379,7 +428,7 @@
                 // disk image, so there is no wrong choice to make here.
                 arch: 'universal',
                 file: asset('macos', 'universal', 'dmg'),
-                note: 'macOS · Apple Silicon and Intel (.dmg)',
+                note: 'macOS Universal · .dmg',
               },
             ],
           },
@@ -392,12 +441,12 @@
                 // Vela ships calls the same machine x64.
                 arch: 'x64',
                 file: asset('linux', 'x86_64', 'AppImage'),
-                note: 'Linux · 64-bit (.AppImage)',
+                note: 'Linux 64-bit · .AppImage',
               },
               {
                 arch: 'arm64',
                 file: asset('linux', 'arm64', 'AppImage'),
-                note: 'Linux · ARM64 (.AppImage)',
+                note: 'Linux ARM64 · .AppImage',
               },
             ],
           },
@@ -408,8 +457,8 @@
         if (/Mac|iPhone|iPad/.test(ua) || /Mac/.test(navigator.platform || '')) detected = 'macos';
         else if (/Linux|X11|Android/.test(ua)) detected = 'linux';
 
-        var primary = document.getElementById('primary-download');
-        var others = document.getElementById('other-downloads');
+        var grid = document.getElementById('downloads');
+        var note = document.getElementById('download-note');
 
         function pick(entry, arch) {
           for (var i = 0; i < entry.builds.length; i += 1) {
@@ -418,45 +467,56 @@
           return entry.builds[0] || null;
         }
 
+        /** Detected platform first, then the rest in their declared order. */
+        function ordered() {
+          var keys = Object.keys(targets);
+          return keys
+            .filter(function (key) {
+              return key === detected;
+            })
+            .concat(
+              keys.filter(function (key) {
+                return key !== detected;
+              }),
+            );
+        }
+
+        function button(className, text) {
+          var element = document.createElement('a');
+          element.className = 'dl' + (className ? ' ' + className : '');
+          element.textContent = text;
+          return element;
+        }
+
         function render(arch) {
-          var entry = targets[detected];
-          var chosen = pick(entry, arch);
+          var chosen = pick(targets[detected], arch);
 
-          if (chosen) {
-            primary.textContent = 'Download for ' + entry.label;
-            primary.href = ASSET + chosen.file;
-            primary.setAttribute('download', '');
-          } else {
-            // Nothing to hand this visitor, so send them somewhere true rather
-            // than at an installer for an operating system they are not on.
-            primary.textContent = 'All downloads';
-            primary.href = REPO + '/releases/latest';
-            primary.removeAttribute('download');
-          }
-
-          others.textContent = '';
-          Object.keys(targets).forEach(function (key) {
+          grid.textContent = '';
+          ordered().forEach(function (key) {
             var target = targets[key];
 
             if (target.builds.length === 0) {
-              var pending = document.createElement('span');
-              pending.className = 'pending';
-              pending.textContent =
-                target.pending || target.label + ' build — not in ' + VERSION + ' yet';
-              others.appendChild(pending);
+              // Same box as the rest, so the grid stays even, but there is
+              // nothing to link it to.
+              var pending = button(
+                'pending',
+                target.pending || target.label + ' — not in ' + VERSION + ' yet',
+              );
+              grid.appendChild(pending);
               return;
             }
 
             target.builds.forEach(function (build) {
-              // The one already on the big button does not need repeating.
-              if (chosen && build.file === chosen.file) return;
-              var link = document.createElement('a');
+              var link = button(build === chosen ? 'is-primary' : '', build.note);
               link.href = ASSET + build.file;
               link.setAttribute('download', '');
-              link.textContent = build.note;
-              others.appendChild(link);
+              grid.appendChild(link);
             });
           });
+
+          note.textContent = chosen
+            ? 'Looks like ' + targets[detected].label + '. Every build is one click away.'
+            : 'Pick the build for your machine.';
         }
 
         // Windows on ARM reports itself as x64 in the user agent for
