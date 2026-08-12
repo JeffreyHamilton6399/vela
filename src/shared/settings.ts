@@ -90,7 +90,9 @@ export const settingsSchema = z.object({
    * model on this machine, so it needs no key and makes no request that leaves
    * the computer.
    */
-  assistantProvider: z.enum(['ollama', 'hosted']).default('ollama'),
+  assistantProvider: z.enum(['local', 'ollama', 'hosted']).default('local'),
+  /** Which catalogue model runs in-process. See assistant/catalogue.ts. */
+  assistantLocalModel: z.string().max(120).default('qwen3-4b-instruct-2507-q4_k_m'),
   assistantOllamaModel: z.string().max(120).default('llama3.2'),
   assistantHostedModel: z.string().max(120).default('llama-3.3-70b-versatile'),
   /** Only used by the hosted provider. Vela ships without a key. */
@@ -152,7 +154,8 @@ export const settingsPatchSchema = z.object({
   onboardingComplete: z.boolean().optional(),
   showBookmarksBar: z.boolean().optional(),
   keepHistory: z.boolean().optional(),
-  assistantProvider: z.enum(['ollama', 'hosted']).optional(),
+  assistantProvider: z.enum(['local', 'ollama', 'hosted']).optional(),
+  assistantLocalModel: z.string().max(120).optional(),
   assistantOllamaModel: z.string().max(120).optional(),
   assistantHostedModel: z.string().max(120).optional(),
   assistantApiKey: z.string().max(400).optional(),

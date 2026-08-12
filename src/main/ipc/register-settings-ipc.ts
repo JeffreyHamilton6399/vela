@@ -7,6 +7,8 @@ import {
   type UpdateState,
   type DownloadItem,
   type HistoryEntry,
+  type LocalModelInfo,
+  type ActionResult,
 } from '../../shared/types/ipc.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { Vault } from '../account/vault.js';
@@ -15,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { addBookmark, moveBookmark, removeBookmark } from '../../shared/bookmarks.js';
 import {
   askAssistant,
+  type LocalRunner,
   assistantStatus,
   pullOllamaModel,
   type AssistantConfig,
@@ -47,6 +50,13 @@ export interface SettingsIpcDeps extends GuardOptions {
   ) => { ok: boolean; error: string | null };
   /** Opens Ollama's download page. Vela never runs an installer itself. */
   openOllamaDownload: (sender: unknown) => { opened: boolean; command: string };
+  /** The in-process model, injected so this module never loads llama.cpp. */
+  localRunner: LocalRunner;
+  models: {
+    list: () => Promise<LocalModelInfo[]>;
+    /** Starts, or joins, the download of one catalogue model. */
+    download: (id: string) => Promise<ActionResult>;
+  };
   downloads: {
     list: (sender: unknown) => DownloadItem[];
     open: (sender: unknown, id: string) => void;
@@ -70,6 +80,7 @@ function assistantConfig(deps: SettingsIpcDeps): AssistantConfig {
   const current = deps.getStore()?.current ?? FALLBACK;
   return {
     provider: current.assistantProvider,
+    localModel: current.assistantLocalModel,
     ollamaModel: current.assistantOllamaModel,
     hostedModel: current.assistantHostedModel,
     apiKey: current.assistantApiKey,
@@ -104,7 +115,7 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
   });
 
   handleInvoke(deps, INVOKE_CHANNELS.assistantAsk, async ({ messages }) =>
-    askAssistant(assistantConfig(deps), messages),
+    askAssistant(assistantConfig(deps), messages, deps.localRunner),
   );
 
   handleInvoke(deps, INVOKE_CHANNELS.accountState, () => ({
@@ -153,8 +164,12 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
 
   handleInvoke(deps, INVOKE_CHANNELS.assistantPull, async ({ model }) => pullOllamaModel(model));
 
+  handleInvoke(deps, INVOKE_CHANNELS.assistantModels, async () => deps.models.list());
+
+  handleInvoke(deps, INVOKE_CHANNELS.assistantModelGet, async ({ id }) => deps.models.download(id));
+
   handleInvoke(deps, INVOKE_CHANNELS.assistantStatus, async () =>
-    assistantStatus(assistantConfig(deps)),
+    assistantStatus(assistantConfig(deps), deps.localRunner),
   );
 
   handleInvoke(deps, INVOKE_CHANNELS.privacyGetReport, (_payload, sender) =>

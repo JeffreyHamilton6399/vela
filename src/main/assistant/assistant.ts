@@ -41,10 +41,25 @@ const PROBE_TIMEOUT_MS = 2_000;
 const MAX_HISTORY = 20;
 
 export interface AssistantConfig {
-  provider: 'ollama' | 'hosted';
+  provider: 'local' | 'ollama' | 'hosted';
+  localModel: string;
   ollamaModel: string;
   hostedModel: string;
   apiKey: string;
+}
+
+/**
+ * The in-process model, injected rather than imported.
+ *
+ * Keeps this module free of the native binary: everything below is fetch and
+ * plain data, and a unit test of it does not have to load llama.cpp.
+ */
+export interface LocalRunner {
+  /** The file for the chosen model, or null when it is not downloaded yet. */
+  resolve: (id: string) => Promise<string | null>;
+  ask: (modelPath: string, messages: readonly AssistantMessage[]) => Promise<string>;
+  /** How the chosen model is doing, for the status line. */
+  describe: (id: string) => Promise<string>;
 }
 
 interface ChatCompletion {
@@ -105,7 +120,20 @@ export async function pullOllamaModel(
   }
 }
 
-export async function assistantStatus(config: AssistantConfig): Promise<AssistantStatus> {
+export async function assistantStatus(
+  config: AssistantConfig,
+  local: LocalRunner,
+): Promise<AssistantStatus> {
+  if (config.provider === 'local') {
+    const file = await local.resolve(config.localModel);
+    return {
+      provider: 'local',
+      ready: file !== null,
+      detail: await local.describe(config.localModel),
+      models: [],
+    };
+  }
+
   if (config.provider === 'hosted') {
     return {
       provider: 'hosted',
@@ -132,7 +160,34 @@ export async function assistantStatus(config: AssistantConfig): Promise<Assistan
 export async function askAssistant(
   config: AssistantConfig,
   messages: readonly AssistantMessage[],
+  local: LocalRunner,
 ): Promise<AssistantReply> {
+  // The in-process model does not go through fetch at all — there is no
+  // request to time out, no port, and nothing to reach.
+  if (config.provider === 'local') {
+    const file = await local.resolve(config.localModel);
+    if (file === null) {
+      return {
+        ok: false,
+        text: '',
+        error: 'No model downloaded yet. Pick one in Settings → Assistant.',
+      };
+    }
+    try {
+      const text = await local.ask(file, messages);
+      if (text.trim() === '') {
+        return { ok: false, text: '', error: 'The assistant returned an empty reply.' };
+      }
+      return { ok: true, text, error: null };
+    } catch (error) {
+      return {
+        ok: false,
+        text: '',
+        error: error instanceof Error ? error.message : 'The local model failed to answer.',
+      };
+    }
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();

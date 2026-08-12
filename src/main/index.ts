@@ -18,6 +18,9 @@ import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
 import { HistoryStore } from './history/history-store.js';
 import { Vault } from './account/vault.js';
+import { LocalModel } from './assistant/local-model.js';
+import { ModelStore } from './assistant/model-store.js';
+import { findModel, MODEL_CATALOGUE } from './assistant/catalogue.js';
 import { fillLogin } from './account/autofill.js';
 import { startDevMetrics } from './dev-metrics.js';
 import { SURFACE } from './window-options.js';
@@ -64,6 +67,22 @@ let favicons: FaviconCache | null = null;
 let updater: Updater | null = null;
 let history: HistoryStore | null = null;
 let vault: Vault | null = null;
+
+/**
+ * The assistant's model: the file on disk, and llama.cpp holding it open.
+ *
+ * Both live for the life of the app rather than per window — a model is
+ * hundreds of megabytes resident, and two windows asking questions should be
+ * asking the same loaded copy.
+ */
+const localModel = new LocalModel();
+let modelStore: ModelStore | null = null;
+
+function broadcastModelProgress(payload: unknown): void {
+  for (const window of windows.values()) {
+    window.send(EVENT_CHANNELS.assistantModelProgress, payload);
+  }
+}
 
 function getAppInfo(): AppInfo {
   return {
@@ -158,6 +177,10 @@ if (!app.requestSingleInstanceLock()) {
       onStateChanged: (state) => {
         broadcastUpdateState(state);
       },
+    });
+
+    modelStore = new ModelStore(path.join(app.getPath('userData'), 'models'), (progress) => {
+      broadcastModelProgress(progress);
     });
 
     history = new HistoryStore();
@@ -275,6 +298,59 @@ if (!app.requestSingleInstanceLock()) {
         return owner === null
           ? { ok: false, error: 'That window has gone.' }
           : owner.resolveCapture(id, save);
+      },
+      models: {
+        list: async () => {
+          const store = modelStore;
+          return Promise.all(
+            MODEL_CATALOGUE.map(async (entry) => ({
+              id: entry.id,
+              label: entry.label,
+              blurb: entry.blurb,
+              parameters: entry.parameters,
+              bytes: entry.bytes,
+              needsBytes: entry.needsBytes,
+              status: (await store?.status(entry.id)) ?? { state: 'absent' as const },
+            })),
+          );
+        },
+        download: (id) => {
+          const store = modelStore;
+          if (store === null)
+            return Promise.resolve({ ok: false, error: 'Models are not ready yet.' });
+          if (findModel(id) === null)
+            return Promise.resolve({ ok: false, error: 'No such model.' });
+          // Deliberately not awaited: a multi-gigabyte download is not a thing
+          // to hold an IPC call open for. Progress arrives on its own channel.
+          void store.download(id);
+          return Promise.resolve({ ok: true, error: null });
+        },
+      },
+      localRunner: {
+        resolve: async (id) => (await modelStore?.pathIfReady(id)) ?? null,
+        ask: async (modelPath, messages) => localModel.ask(modelPath, messages),
+        describe: async (id) => {
+          const entry = findModel(id);
+          if (entry === null) return 'No model chosen. Pick one in Settings → Assistant.';
+
+          const status = (await modelStore?.status(id)) ?? { state: 'absent' as const };
+          switch (status.state) {
+            case 'ready':
+              return `${entry.label} runs inside Vela. Nothing leaves this machine — there is no server to leave to.`;
+            case 'downloading': {
+              const done = Math.round(
+                (status.receivedBytes / Math.max(1, status.totalBytes)) * 100,
+              );
+              return `Downloading ${entry.label} — ${String(done)}%. This happens once.`;
+            }
+            case 'verifying':
+              return `Checking ${entry.label} against its checksum.`;
+            case 'failed':
+              return `${entry.label} did not download: ${status.error}`;
+            default:
+              return `${entry.label} is not downloaded yet.`;
+          }
+        },
       },
       openOllamaDownload: (sender) => {
         // Opened in a Vela tab rather than handed to shell.openExternal: this

@@ -3,6 +3,7 @@ import type { Settings } from '../../shared/settings.js';
 import { SEARCH_ENGINES } from '../../shared/search-engines.js';
 import { BANGS } from '../../shared/bangs.js';
 import { PROXY_PRESETS, presetForRules, SUGGESTED_MODELS } from '../../shared/providers.js';
+import { LocalModelPicker } from './LocalModelPicker.js';
 import type { AssistantStatus } from '../../shared/types/ipc.js';
 import { AccountSection } from './AccountSection.js';
 import { CloseIcon } from './icons.js';
@@ -463,6 +464,25 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
                       <input
                         type="radio"
                         name="assistant-provider"
+                        checked={settings.assistantProvider === 'local'}
+                        onChange={() => {
+                          set({ assistantProvider: 'local' });
+                        }}
+                        className="focus-ring mt-[3px] h-[14px] w-[14px] shrink-0 accent-ink"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[13px] text-ink">In Vela — recommended</span>
+                        <span className="block text-[12px] leading-relaxed text-ink-muted">
+                          The model runs inside Vela itself. Nothing to install, no port to talk to,
+                          and no request to leave: pick one below and it downloads once.
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg p-1 hover:bg-hover">
+                      <input
+                        type="radio"
+                        name="assistant-provider"
                         checked={settings.assistantProvider === 'ollama'}
                         onChange={() => {
                           set({ assistantProvider: 'ollama' });
@@ -471,7 +491,7 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
                       />
                       <span className="min-w-0">
                         <span className="block text-[13px] text-ink">
-                          Local model (Ollama) — recommended
+                          Ollama, if you already run it
                         </span>
                         <span className="block text-[12px] leading-relaxed text-ink-muted">
                           Talks to Ollama on 127.0.0.1. Install it from ollama.com, then run{' '}
@@ -504,7 +524,14 @@ export function SettingsPanel({ settings, onClose }: SettingsPanelProps): JSX.El
                     </label>
                   </div>
 
-                  {settings.assistantProvider === 'ollama' ? (
+                  {settings.assistantProvider === 'local' ? (
+                    <LocalModelPicker
+                      selected={settings.assistantLocalModel}
+                      onSelect={(id) => {
+                        set({ assistantLocalModel: id });
+                      }}
+                    />
+                  ) : settings.assistantProvider === 'ollama' ? (
                     <ModelPicker
                       selected={settings.assistantOllamaModel}
                       onSelect={(model) => {

@@ -25,6 +25,8 @@ import {
   capturedLoginSchema,
   type CapturedLogin,
   actionResultSchema,
+  localModelSchema,
+  modelProgressSchema,
   vaultEntrySchema,
   windowStateSchema,
   type PrivacyReport,
@@ -38,6 +40,8 @@ import {
   type AssistantStatus,
   type AccountState,
   type ActionResult,
+  type LocalModelInfo,
+  type ModelProgress,
   type VaultEntry,
   type AppInfo,
   type BrowserState,
@@ -301,6 +305,26 @@ const bridge: VelaBridge = {
       return z
         .object({ opened: z.boolean(), command: z.string() })
         .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.assistantInstall));
+    },
+    async models(): Promise<LocalModelInfo[]> {
+      return z
+        .array(localModelSchema)
+        .parse(await ipcRenderer.invoke(INVOKE_CHANNELS.assistantModels));
+    },
+    async getModel(id: string): Promise<ActionResult> {
+      return actionResultSchema.parse(
+        await ipcRenderer.invoke(INVOKE_CHANNELS.assistantModelGet, { id }),
+      );
+    },
+    onModelProgress(listener: (progress: ModelProgress) => void): () => void {
+      const wrapped = (_event: IpcRendererEvent, payload: unknown): void => {
+        const parsed = modelProgressSchema.safeParse(payload);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(EVENT_CHANNELS.assistantModelProgress, wrapped);
+      return () => {
+        ipcRenderer.off(EVENT_CHANNELS.assistantModelProgress, wrapped);
+      };
     },
     async pull(model: string): Promise<{ ok: boolean; error: string | null }> {
       return z

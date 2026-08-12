@@ -51,8 +51,37 @@ export const assistantReplySchema = z.object({
 });
 export type AssistantReply = z.infer<typeof assistantReplySchema>;
 
+export const modelStatusSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('absent') }),
+  z.object({
+    state: z.literal('downloading'),
+    receivedBytes: z.number().nonnegative(),
+    totalBytes: z.number().nonnegative(),
+  }),
+  z.object({ state: z.literal('verifying') }),
+  z.object({ state: z.literal('ready') }),
+  z.object({ state: z.literal('failed'), error: z.string() }),
+]);
+export type ModelStatus = z.infer<typeof modelStatusSchema>;
+
+export const modelProgressSchema = z.object({ id: z.string(), status: modelStatusSchema });
+export type ModelProgress = z.infer<typeof modelProgressSchema>;
+
+/** One model Vela can run in-process, and whether it is here yet. */
+export const localModelSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  blurb: z.string(),
+  parameters: z.string(),
+  bytes: z.number().nonnegative(),
+  /** Roughly the memory it wants resident, for "comfortable on this machine". */
+  needsBytes: z.number().nonnegative(),
+  status: modelStatusSchema,
+});
+export type LocalModelInfo = z.infer<typeof localModelSchema>;
+
 export const assistantStatusSchema = z.object({
-  provider: z.enum(['ollama', 'hosted']),
+  provider: z.enum(['local', 'ollama', 'hosted']),
   ready: z.boolean(),
   detail: z.string(),
   models: z.array(z.string()),
@@ -245,6 +274,8 @@ export const INVOKE_CHANNELS = {
   assistantStatus: 'assistant:status',
   layoutOpenOverlay: 'layout:open-overlay',
   assistantPull: 'assistant:pull',
+  assistantModels: 'assistant:models',
+  assistantModelGet: 'assistant:model-get',
   assistantInstall: 'assistant:install',
   accountState: 'account:state',
   accountCreate: 'account:create',
@@ -323,6 +354,7 @@ export const EVENT_CHANNELS = {
   settingsChanged: 'settings:changed',
   updateStateChanged: 'updates:state-changed',
   downloadsChanged: 'downloads:changed',
+  assistantModelProgress: 'assistant:model-progress',
   loginCaptured: 'account:login-captured',
 } as const;
 
@@ -393,6 +425,14 @@ export const invokeContract = {
   [INVOKE_CHANNELS.assistantInstall]: {
     request: emptySchema,
     response: z.object({ opened: z.boolean(), command: z.string() }),
+  },
+  [INVOKE_CHANNELS.assistantModels]: {
+    request: emptySchema,
+    response: z.array(localModelSchema),
+  },
+  [INVOKE_CHANNELS.assistantModelGet]: {
+    request: z.object({ id: z.string().max(120) }),
+    response: actionResultSchema,
   },
   [INVOKE_CHANNELS.assistantPull]: {
     request: z.object({ model: z.string().min(1).max(120) }),
@@ -480,6 +520,7 @@ export const eventContract = {
   [EVENT_CHANNELS.settingsChanged]: settingsSchema,
   [EVENT_CHANNELS.updateStateChanged]: updateStateSchema,
   [EVENT_CHANNELS.downloadsChanged]: z.array(downloadItemSchema),
+  [EVENT_CHANNELS.assistantModelProgress]: modelProgressSchema,
   [EVENT_CHANNELS.loginCaptured]: capturedLoginSchema,
 } as const satisfies Record<EventChannel, z.ZodType>;
 
@@ -610,6 +651,11 @@ export interface VelaBridge {
     pull(model: string): Promise<{ ok: boolean; error: string | null }>;
     /** Opens Ollama's download page and returns the package-manager one-liner. */
     install(): Promise<{ opened: boolean; command: string }>;
+    /** Every model Vela can run in-process, and whether it is downloaded. */
+    models(): Promise<LocalModelInfo[]>;
+    /** Starts fetching one. Returns immediately; watch onModelProgress. */
+    getModel(id: string): Promise<ActionResult>;
+    onModelProgress(listener: (progress: ModelProgress) => void): () => void;
   };
   readonly history: {
     search(query: string, limit?: number): Promise<HistoryEntry[]>;

@@ -42,9 +42,13 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 
 ### The assistant runs locally by default
 
-The sidebar assistant defaults to **Ollama on your own machine** — no key, no account, and no request that leaves the computer. Install Ollama, `ollama pull llama3.2`, and the panel works.
+The sidebar assistant defaults to **a model running inside Vela itself**. Nothing to install, no second program, and no port to talk to: llama.cpp is linked into the process, so a question never becomes a network request in the first place. That is a stronger claim than "the request only goes to localhost" — there is no request.
 
-The alternative is a hosted service using **a key you paste into Settings**. Vela ships without one and could not usefully ship with one: this is a downloadable app, so an embedded key sits in `app.asar` for anyone who unzips it and bills whoever put it there.
+Vela ships without a model on purpose. A four-gigabyte GGUF inside the installer would be a miserable download for everyone who never opens the assistant, and it would ride along in every update after. So Settings → Assistant offers a short catalogue with sizes, and the one you pick downloads once — resumable, and checked against its SHA-256 before it is used, because a truncated GGUF fails somewhere deep inside llama.cpp rather than saying "the download did not finish".
+
+Only the CPU build of llama.cpp is shipped. The CUDA and Vulkan binaries are 163 MB and 95 MB against 46 for CPU, which would quadruple the installer for hardware most people do not have.
+
+**Ollama** is still there for anyone who already runs it, and the alternative to both is a hosted service using **a key you paste into Settings**. Vela ships without one and could not usefully ship with one: this is a downloadable app, so an embedded key sits in `app.asar` for anyone who unzips it and bills whoever put it there.
 
 Only the hosted option adds a network destination beyond the two above, which is why it is not the default.
 

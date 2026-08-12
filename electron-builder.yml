@@ -12,6 +12,12 @@ files:
   - build/icon.png
   - package.json
   - '!**/*.map'
+  # llama.cpp ships a prebuilt binary per backend, and the GPU ones are most of
+  # the weight: CUDA is 163 MB and its extras another 347, Vulkan 95, against
+  # 46 for plain CPU. Shipping all of them would quadruple the installer for
+  # hardware most people do not have, so Vela carries the CPU build only.
+  - '!node_modules/@node-llama-cpp/*-cuda*/**'
+  - '!node_modules/@node-llama-cpp/*-vulkan/**'
 
 extraResources:
   # The ad/tracker engine compiled by scripts/fetch-filters.mjs. Shipping it
