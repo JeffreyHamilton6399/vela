@@ -12,7 +12,7 @@ import type { Platform } from '../shared/types/ipc.js';
 import type { SettingsStore } from './settings/store.js';
 import type { Workspace } from '../shared/settings.js';
 import type { BlockerHandle } from './privacy/adblock.js';
-import type { BrowserIdentity } from './privacy/policies.js';
+import { clientHintPlatform, type BrowserIdentity } from './privacy/policies.js';
 import type { FaviconCache } from './favicons/favicon-cache.js';
 import type { HistoryStore } from './history/history-store.js';
 import { DownloadManager } from './downloads/download-manager.js';
@@ -22,6 +22,7 @@ import { hardenSession } from './privacy/session-hardening.js';
 import { createWindowOptions } from './window-options.js';
 import { readWindowState } from './ipc/register-window-ipc.js';
 import { popupPageMenu } from './menus/page-menu.js';
+import { registerChromeShim } from './tabs/chrome-shim.js';
 import { TabManager } from './tabs/tab-manager.js';
 import type { Tab } from './tabs/tab.js';
 import type { Vault } from './account/vault.js';
@@ -162,6 +163,7 @@ export class VelaWindow {
         if (options.isPrivate || !options.settings.current.keepHistory) return;
         options.history?.record(url, title);
       },
+      onViewCreated: async (contents) => this.restoreChromeSurface(contents),
       onPageReady: (tab) => {
         this.autofillLogin(tab);
         this.watchForLoginToSave(tab);
@@ -282,6 +284,26 @@ export class VelaWindow {
       },
       searchEngineId: () => this.options.settings.current.searchEngineId,
       isDev: this.options.isDev,
+    });
+  }
+
+  /**
+   * Puts back the parts of Chrome's JavaScript surface Electron omits, on the
+   * handful of hosts that check for them.
+   *
+   * Vela's headers already say Chrome; this is the half that is read from the
+   * page instead, and without it Google's sign-in ends on "this browser or app
+   * may not be secure". It is the same injection door the autofill uses, so
+   * tabs keep their sandbox and their context isolation and gain no bridge.
+   *
+   * It is not relied on: `SignInRejectedBanner` still explains a refusal, for
+   * the day Google checks something else.
+   */
+  private async restoreChromeSurface(contents: WebContents): Promise<void> {
+    await registerChromeShim(contents, {
+      chromeMajorVersion: this.options.identity.chromeMajorVersion,
+      chromeFullVersion: process.versions.chrome,
+      platform: clientHintPlatform(this.options.identity.platform),
     });
   }
 
