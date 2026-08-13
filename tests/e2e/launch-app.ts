@@ -27,6 +27,21 @@ export interface FixtureServer {
 }
 
 /**
+ * Content types the fixtures are served with.
+ *
+ * A favicon has to arrive labelled as an image or the browser will not treat it
+ * as one, and Vela's own icon path refuses `text/html` on purpose — a
+ * single-page app that answers every unknown address with its index.html is the
+ * common case that guard exists for.
+ */
+const CONTENT_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+};
+
+/**
  * Serves the fixtures over http://localhost.
  *
  * Some behaviour is deliberately scoped to real web origins — bookmarks and
@@ -45,7 +60,8 @@ export async function startFixtureServer(): Promise<FixtureServer> {
         response.writeHead(404).end('not found');
         return;
       }
-      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(body);
+      const type = CONTENT_TYPES[path.extname(file)] ?? CONTENT_TYPES['.html'];
+      response.writeHead(200, { 'content-type': type ?? 'text/html' }).end(body);
     });
   });
 

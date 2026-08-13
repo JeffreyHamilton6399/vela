@@ -7,14 +7,12 @@ import type { TabSnapshot } from '../../shared/types/ipc.js';
  * Without this the page reads as Vela being broken: "Couldn't sign you in"
  * with no explanation, on a browser that has just told you it is private and
  * secure. It is neither a bug nor a password problem, and the honest thing is
- * to say which it is and offer the way round it.
+ * to say which it is and hand over the way round it.
  *
- * Vela does put back the parts of Chrome's JavaScript surface Google checks
- * for — see chrome-shim.ts — and on the measured page that is the whole of the
- * gate. It is nobody's guarantee: the check is Google's to change whenever it
- * likes, and a build where the shim did not take behaves as Vela did before.
- * This banner is what that case looks like, and the way round it is the
- * machine's own browser.
+ * Google's refusal is not a check Vela can pass — see rejection.ts for what was
+ * tried and what it cost. The copy says so plainly rather than implying a fix
+ * is coming, and the button is the one thing that actually works: the same
+ * address, in the browser Google already trusts.
  */
 export function SignInRejectedBanner({ tab }: { tab: TabSnapshot | null }): JSX.Element | null {
   const service = tab?.signInRejectedBy ?? null;
@@ -27,12 +25,11 @@ export function SignInRejectedBanner({ tab }: { tab: TabSnapshot | null }): JSX.
     >
       <span className="min-w-0 flex-1 text-ink-muted">
         <strong className="font-medium text-ink">
-          {service} would not sign you in on this browser.
+          {service} does not allow sign-in from browsers it does not recognise.
         </strong>{' '}
-        Nothing is wrong with your password. {service} checks the browser itself before it checks
-        anything you typed, and this time Vela did not satisfy the check — which {service} is free
-        to change whenever it likes. Signing in with your usual browser works, and the rest of{' '}
-        {service} is fine here.
+        Nothing is wrong with your password — {service} checks the browser before it checks anything
+        you typed, and it only accepts a short list of them. That is {service}&rsquo;s decision, not
+        a fault Vela can fix. Sign in with your usual browser; the rest of {service} works here.
       </span>
 
       <button

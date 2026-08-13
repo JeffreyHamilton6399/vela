@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { nativeImage, type Session } from 'electron';
+import type { IconDecoder } from './icon-decoder.js';
 
 /** Icons are normalised to this size before caching, which bounds their cost. */
 const ICON_SIZE = 32;
@@ -22,10 +23,22 @@ export class FaviconCache {
   private dirty = false;
   private readonly file: string;
 
+  /**
+   * Called the first time an icon is cached for an origin.
+   *
+   * What is saved for a site — a bookmark, a tile, a docked panel — stores the
+   * icon that was known when it was saved, which for anything saved early is
+   * none. This is the hook that goes back and fills those in; see
+   * icon-backfill.ts.
+   */
+  onCached: ((origin: string, icon: string) => void) | null = null;
+
   constructor(
     userDataDir: string,
     /** Private windows keep their icons in memory only. */
     private readonly persist: boolean,
+    /** Reads the formats `nativeImage` cannot. Absent means "skip those". */
+    private readonly decoder: IconDecoder | null = null,
   ) {
     this.file = path.join(userDataDir, 'favicons.json');
   }
@@ -90,6 +103,7 @@ export class FaviconCache {
           this.entries.set(key, dataUrl);
           this.dirty = true;
           void this.save();
+          this.onCached?.(key, dataUrl);
         }
         return dataUrl;
       })
@@ -101,6 +115,33 @@ export class FaviconCache {
     return task;
   }
 
+  /**
+   * Asks a site for its icon at the conventional address, for a site Vela has
+   * been told about but has not loaded.
+   *
+   * A page announces its icon in its own markup, so nearly every icon here
+   * arrives through `resolve` as a free ride on a page the user opened. A site
+   * docked into the sidebar is the exception: it is named, stored and drawn in
+   * the rail before anything has fetched a byte of it, and until then it is a
+   * letter in a square. `/favicon.ico` is one request to the one site the user
+   * has just asked to keep open beside the page — strictly less than the load
+   * that follows the first click on it.
+   *
+   * Only that one address, and no fallback beyond it. A site that declares its
+   * icon in HTML and serves nothing at the conventional path keeps its letter
+   * until the panel is first opened, which is the moment `resolve` gets it for
+   * real. The alternative was to guess further up the domain — `google.com` for
+   * Calendar, `facebook.com` for Messenger — and a confidently wrong icon is
+   * worse than an honest initial.
+   */
+  async resolveDefault(pageUrl: string, session: Session): Promise<string | null> {
+    const key = keyFor(pageUrl);
+    if (key === null) return null;
+    // `keyFor` gives back the origin, so this is that site's own icon and
+    // never a third party's guess at it.
+    return this.resolve(pageUrl, `${key}/favicon.ico`, session);
+  }
+
   private async download(iconUrl: string, session: Session): Promise<string | null> {
     if (!iconUrl.startsWith('http://') && !iconUrl.startsWith('https://')) return null;
 
@@ -108,15 +149,28 @@ export class FaviconCache {
       const response = await session.fetch(iconUrl);
       if (!response.ok) return null;
 
+      // A single-page app commonly answers any address it does not recognise
+      // with its own index.html, and answers it with a 200. Half a megabyte of
+      // markup is not an icon, and it is not worth trying to decode.
+      const type = response.headers.get('content-type') ?? '';
+      if (type.startsWith('text/html')) return null;
+
       const buffer = Buffer.from(await response.arrayBuffer());
       if (buffer.byteLength === 0 || buffer.byteLength > MAX_DOWNLOAD_BYTES) return null;
 
       // Re-encoding through nativeImage means only real, decodable raster data
       // ever reaches the renderer — never an arbitrary blob a site chose.
       const image = nativeImage.createFromBuffer(buffer);
-      if (image.isEmpty()) return null;
+      if (!image.isEmpty()) {
+        return image.resize({ width: ICON_SIZE, height: ICON_SIZE, quality: 'good' }).toDataURL();
+      }
 
-      return image.resize({ width: ICON_SIZE, height: ICON_SIZE, quality: 'good' }).toDataURL();
+      // nativeImage reads PNG and JPEG. Most favicons are ICO or SVG, which it
+      // returns empty for — so the ones it cannot read go to Chromium, which
+      // can, in a window that holds nothing else. See icon-decoder.ts.
+      return (
+        (await this.decoder?.toPngDataUrl(buffer, type === '' ? 'image/x-icon' : type)) ?? null
+      );
     } catch {
       return null;
     }

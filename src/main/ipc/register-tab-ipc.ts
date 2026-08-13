@@ -7,7 +7,8 @@ export interface TabIpcDeps extends GuardOptions {
   getPanels: (sender: unknown) => PanelManager | null;
   /** The saved panel list, so open() knows which URL to load. */
   findPanel: (id: string) => { id: string; url: string } | null;
-  addPanel: (url: string, title: string) => void;
+  /** `sender` names the window, and so the session an icon is fetched through. */
+  addPanel: (url: string, title: string, sender: unknown) => void;
   removePanel: (id: string) => void;
   getManager: (sender: unknown) => TabManager | null;
   /** Pops the native tab context menu at the cursor. */
@@ -195,8 +196,8 @@ export function registerTabIpc(deps: TabIpcDeps): void {
     deps.getPanels(sender)?.close();
   });
 
-  handleSend(deps, SEND_CHANNELS.panelsAdd, ({ url, title }) => {
-    deps.addPanel(url, title);
+  handleSend(deps, SEND_CHANNELS.panelsAdd, ({ url, title }, sender) => {
+    deps.addPanel(url, title, sender);
   });
 
   handleSend(deps, SEND_CHANNELS.panelsRemove, ({ id }, sender) => {

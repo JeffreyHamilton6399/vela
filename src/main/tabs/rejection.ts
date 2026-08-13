@@ -2,19 +2,21 @@
  * Noticing when a site has refused to sign you in because of what browser this
  * is, rather than because of anything you typed.
  *
- * Vela sends a plain Chrome user agent and the client hints to match, so a
- * check made against the headers passes. Google's is not made against the
- * headers. It reads the page's own JavaScript, where an Electron build gives
- * itself away: `navigator.userAgentData.brands` carries no `Google Chrome`
- * entry, and `window.chrome` is an empty object where a real Chrome has
- * `runtime`, `csi`, `loadTimes` and `app` hanging off it. Both are put back
- * for Google's sign-in hosts — see chrome-shim.ts — and on the page as
- * measured that is the whole of the gate.
+ * Google's sign-in is the one that does this, and it cannot be talked round.
+ * Vela sends a plain Chrome user agent with the client hints to match, so the
+ * page loads and any check made against the headers passes; Google's is not
+ * made against the headers. Vela also spent a version restoring the parts of
+ * Chrome's JavaScript surface that Electron omits — the four `window.chrome`
+ * members, the `Google Chrome` brand in `navigator.userAgentData` — injected at
+ * document-start, verified present on the page, with `navigator.webdriver`
+ * false beside them. Google refused the same address at the same step anyway.
+ * Whatever it reads, it is not that, and the guess cost every tab a debugger
+ * attachment and a lie about what browser it was. Both are gone.
  *
- * None of which is load-bearing. The check belongs to Google and can change
- * without notice, so this stays: when a refusal happens anyway, Vela
- * recognises it and says what happened, because "Couldn't sign you in" with no
- * explanation reads as Vela being broken, which is the one thing it is not.
+ * So this is what is left, and it is the honest half: recognise the refusal and
+ * say what it was. "Couldn't sign you in" with no explanation reads as Vela
+ * being broken, which is the one thing it is not — you have been turned away at
+ * the door, and the way in is a browser Google already knows.
  */
 
 /** A sign-in refused for being the wrong browser, never for a wrong password. */

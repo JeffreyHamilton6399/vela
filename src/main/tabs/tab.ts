@@ -17,11 +17,6 @@ export interface TabEvents {
   onOpenInNewTab: (url: string, opener: Tab) => void;
   /** A sized `window.open`, which is what a sign-in popup looks like. */
   onOpenPopup: (window: BrowserWindow) => void;
-  /**
-   * A fresh view, before it has been sent anywhere. Awaited: what hangs off
-   * this has to be in place before the first real navigation, not racing it.
-   */
-  onViewCreated: (contents: WebContentsView['webContents']) => Promise<void>;
   /** Resolves a locally cached icon for a page; remote icons never reach the UI. */
   resolveFavicon: (pageUrl: string, iconUrl: string) => void;
   /** A completed top-level navigation: history and per-host zoom hang off this. */
@@ -80,8 +75,6 @@ export class Tab {
   private interstitialUrl: string | null = null;
   /** Set when a site has just refused to sign in because of what Vela is. */
   private rejectedBy: string | null = null;
-  /** Resolves once this view's document-start setup is registered. */
-  private prepared: Promise<void> = Promise.resolve();
   private title = 'New Tab';
   private faviconUrl: string | null = null;
   private loading = false;
@@ -120,15 +113,6 @@ export class Tab {
     view.setBackgroundColor('#ffffff');
     this.currentView = view;
     this.wireEvents(view);
-
-    // A blank page first, because what runs at document-start has to be
-    // registered against a live renderer and there is not one until something
-    // has loaded. Every later navigation waits on this, so a tab created with
-    // an address cannot outrun its own setup.
-    this.prepared = view.webContents
-      .loadURL(BLANK)
-      .then(async () => this.events.onViewCreated(view.webContents))
-      .catch(() => undefined);
 
     return view;
   }
@@ -240,11 +224,9 @@ export class Tab {
     this.hasLoadedPage = true;
     this.currentUrl = url;
 
-    void this.prepared
-      .then(async () => contents.loadURL(url))
-      .catch(() => {
-        // did-fail-load reports this to the UI; a rejected promise here is noise.
-      });
+    void contents.loadURL(url).catch(() => {
+      // did-fail-load reports this to the UI; a rejected promise here is noise.
+    });
   }
 
   /**

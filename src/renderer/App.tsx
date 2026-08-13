@@ -19,6 +19,7 @@ import { SignInRejectedBanner } from './components/SignInRejectedBanner.js';
 import { UpdateBanner, useUpdateState } from './components/UpdateBanner.js';
 import { SaveLoginPrompt, useCapturedLogin } from './components/SaveLoginPrompt.js';
 import { CloseIcon, DownloadIcon } from './components/icons.js';
+import { SIDEBAR_FRAME } from './components/sidebar-frame.js';
 import { usePanelBounds } from './hooks/usePanelBounds.js';
 import { useActiveTab, useBrowserState } from './hooks/useBrowserState.js';
 import { useContentInsets } from './hooks/useContentInsets.js';
@@ -29,6 +30,14 @@ import { useWindowState } from './hooks/useWindowState.js';
 
 // Split out of the initial bundle: none of these exist until asked for, and
 // keeping them out shortens the path to first paint.
+//
+// Each one gets its own Suspense boundary, right where it is used. A single
+// boundary around the whole window looks tidier and is a bug: React hides
+// everything inside a boundary while anything in it is still loading, so the
+// first click on Notes took the rail, the toolbar and the page region with it —
+// the content region measured 0×0, the page view was resized to nothing, and
+// the window went blank for as long as the chunk took to arrive. Nothing that
+// is already on screen belongs inside a boundary that something new can suspend.
 const Sidebar = lazy(async () => ({ default: (await import('./components/Sidebar.js')).Sidebar }));
 const SettingsPanel = lazy(async () => ({
   default: (await import('./components/SettingsPanel.js')).SettingsPanel,
@@ -190,71 +199,73 @@ export function App(): JSX.Element {
         }}
       />
 
-      <Suspense fallback={null}>
-        <div className="flex min-h-0 flex-1">
-          <WorkspaceRail
-            workspaces={browser.workspaces}
-            activeId={browser.activeWorkspaceId}
-            sidebarTool={sidebarOpen && openPanelId === null ? sidebarTool : null}
-            panels={settings.webPanels}
-            openPanelId={openPanelId}
-            onPickPanel={(id) => {
-              if (openPanelId === id) {
-                setOpenPanelId(null);
-                setSidebarOpen(false);
-                window.vela.panels.close();
-                return;
-              }
-              setOpenPanelId(id);
-              setSidebarOpen(true);
-              window.vela.panels.open(id);
-            }}
-            onAddPanel={() => {
-              setAddingPanel(true);
+      <div className="flex min-h-0 flex-1">
+        <WorkspaceRail
+          workspaces={browser.workspaces}
+          activeId={browser.activeWorkspaceId}
+          sidebarTool={sidebarOpen && openPanelId === null ? sidebarTool : null}
+          panels={settings.webPanels}
+          openPanelId={openPanelId}
+          onPickPanel={(id) => {
+            if (openPanelId === id) {
               setOpenPanelId(null);
-              setSidebarTool('panels');
+              setSidebarOpen(false);
+              window.vela.panels.close();
+              return;
+            }
+            setOpenPanelId(id);
+            setSidebarOpen(true);
+            window.vela.panels.open(id);
+          }}
+          onAddPanel={() => {
+            setAddingPanel(true);
+            setOpenPanelId(null);
+            setSidebarTool('panels');
+            setSidebarOpen(true);
+            window.vela.panels.close();
+          }}
+          onPickTool={(tool) => {
+            setOpenPanelId(null);
+            window.vela.panels.close();
+            // Clicking the tool you are already on closes the panel.
+            if (sidebarOpen && openPanelId === null && tool === sidebarTool) {
+              setSidebarOpen(false);
+            } else {
+              setSidebarTool(tool);
               setSidebarOpen(true);
-              window.vela.panels.close();
-            }}
-            onPickTool={(tool) => {
-              setOpenPanelId(null);
-              window.vela.panels.close();
-              // Clicking the tool you are already on closes the panel.
-              if (sidebarOpen && openPanelId === null && tool === sidebarTool) {
-                setSidebarOpen(false);
-              } else {
-                setSidebarTool(tool);
-                setSidebarOpen(true);
-              }
-            }}
-            onOpenSettings={() => {
-              openSettings();
-            }}
-          />
+            }
+          }}
+          onOpenSettings={() => {
+            openSettings();
+          }}
+        />
 
-          {/* The page view is positioned over this element by the main process. */}
-          <div
-            ref={contentRef}
-            data-content-region
-            className="relative min-h-0 min-w-0 flex-1 bg-surface"
-          >
-            <ContentRegion tab={tab} settings={settings} />
+        {/* The page view is positioned over this element by the main process. */}
+        <div
+          ref={contentRef}
+          data-content-region
+          className="relative min-h-0 min-w-0 flex-1 bg-surface"
+        >
+          <ContentRegion tab={tab} settings={settings} />
 
-            {/* The page as it was a moment ago, for a dialog to sit on. Purely
-                decorative, and never interactive: the real page is hidden
-                behind it and comes straight back when the dialog closes. */}
-            {pageBehind === null ? null : (
-              <img
-                src={pageBehind}
-                alt=""
-                aria-hidden
-                draggable={false}
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top select-none"
-              />
-            )}
+          {/* The page as it was a moment ago, for a dialog to sit on. Purely
+              decorative, and never interactive: the real page is hidden
+              behind it and comes straight back when the dialog closes. */}
+          {pageBehind === null ? null : (
+            <img
+              src={pageBehind}
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top select-none"
+            />
+          )}
 
-            {settings.onboardingComplete ? null : <Onboarding settings={settings} />}
+          {settings.onboardingComplete ? null : <Onboarding settings={settings} />}
 
+          {/* Nothing to show while a dialog's chunk loads: it arrives over the
+              page, so an empty frame would be worse than a beat of nothing. */}
+          <Suspense fallback={null}>
             {settingsOpen ? (
               <SettingsPanel
                 settings={settings}
@@ -287,36 +298,41 @@ export function App(): JSX.Element {
                 }}
               />
             ) : null}
-          </div>
+          </Suspense>
+        </div>
 
-          {sidebarOpen && openPanelId !== null ? (
-            <aside
-              ref={sidebarRef}
-              aria-label="Web panel"
-              className="flex w-[340px] shrink-0 flex-col border-l border-line bg-raised"
-            >
-              <div className="flex h-5 shrink-0 items-center justify-between gap-1 border-b border-line px-2">
-                <span className="truncate text-[13px] font-semibold text-ink">
-                  {settings.webPanels.find((panel) => panel.id === openPanelId)?.title ?? 'Panel'}
-                </span>
-                <button
-                  type="button"
-                  aria-label="Close panel"
-                  onClick={() => {
-                    setOpenPanelId(null);
-                    setSidebarOpen(false);
-                    window.vela.panels.close();
-                  }}
-                  className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
-                >
-                  <CloseIcon width={11} height={11} />
-                </button>
-              </div>
-              {/* The docked site is a WebContentsView, positioned over this. */}
-              <div className="min-h-0 flex-1" />
-            </aside>
-          ) : null}
+        {sidebarOpen && openPanelId !== null ? (
+          <aside
+            ref={sidebarRef}
+            aria-label="Web panel"
+            className="flex w-[340px] shrink-0 flex-col border-l border-line bg-raised"
+          >
+            <div className="flex h-5 shrink-0 items-center justify-between gap-1 border-b border-line px-2">
+              <span className="truncate text-[13px] font-semibold text-ink">
+                {settings.webPanels.find((panel) => panel.id === openPanelId)?.title ?? 'Panel'}
+              </span>
+              <button
+                type="button"
+                aria-label="Close panel"
+                onClick={() => {
+                  setOpenPanelId(null);
+                  setSidebarOpen(false);
+                  window.vela.panels.close();
+                }}
+                className="focus-ring flex h-4 w-4 items-center justify-center rounded-lg text-ink-muted hover:bg-hover hover:text-ink"
+              >
+                <CloseIcon width={11} height={11} />
+              </button>
+            </div>
+            {/* The docked site is a WebContentsView, positioned over this. */}
+            <div className="min-h-0 flex-1" />
+          </aside>
+        ) : null}
 
+        {/* The fallback is the sidebar's own footprint, so the page region is
+            the width it is about to be and the page view is positioned once
+            rather than twice. */}
+        <Suspense fallback={<div aria-hidden className={SIDEBAR_FRAME} />}>
           {sidebarOpen && openPanelId === null ? (
             <Sidebar
               tool={sidebarTool}
@@ -337,8 +353,8 @@ export function App(): JSX.Element {
               }}
             />
           ) : null}
-        </div>
-      </Suspense>
+        </Suspense>
+      </div>
     </div>
   );
 }

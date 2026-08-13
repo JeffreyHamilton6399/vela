@@ -1,11 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  shell,
-  type BrowserWindow,
-  type ContextMenuParams,
-  type Session,
-  type WebContents,
-} from 'electron';
+import { shell, type BrowserWindow, type ContextMenuParams, type Session } from 'electron';
 import type { BrowserState } from '../../shared/types/ipc.js';
 import type { Workspace } from '../../shared/settings.js';
 import { resolveAddressInput } from '../../shared/address-input.js';
@@ -50,8 +44,6 @@ export interface TabManagerOptions {
   recordVisit: (url: string, title: string) => void;
   /** A tab whose DOM is ready. Login autofill hangs off this. */
   onPageReady: (tab: Tab) => void;
-  /** A newly created view, before it has navigated anywhere. */
-  onViewCreated: (contents: WebContents) => Promise<void>;
   /** A right-click inside a page, with what was under the pointer. */
   onPageContextMenu: (tab: Tab, params: ContextMenuParams) => void;
   /** Chromium zoom level remembered for a host, or 0. */
@@ -236,7 +228,6 @@ export class TabManager {
         onOpenInNewTab: (url, opener) => {
           this.create({ url, active: true, openerId: opener.id });
         },
-        onViewCreated: async (contents) => this.options.onViewCreated(contents),
         onOpenPopup: (popup) => {
           configurePopup(popup, {
             vetNavigation: (url) => this.vetNavigation(url),

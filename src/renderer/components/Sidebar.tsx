@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import type { WebPanel } from '../../shared/settings.js';
 import { Assistant } from './Assistant.js';
 import { CloseIcon } from './icons.js';
+import { SIDEBAR_FRAME } from './sidebar-frame.js';
 
 export type SidebarTool = 'assistant' | 'notes' | 'panels';
 
@@ -143,10 +144,7 @@ export function Sidebar({
   onClose,
 }: SidebarProps): JSX.Element {
   return (
-    <aside
-      aria-label="Sidebar tools"
-      className="flex h-full w-[280px] shrink-0 flex-col gap-2 border-l border-line bg-raised p-2"
-    >
+    <aside aria-label="Sidebar tools" className={`flex h-full flex-col gap-2 p-2 ${SIDEBAR_FRAME}`}>
       <div className="flex items-center justify-between gap-1">
         <h2 className="text-[13px] font-semibold tracking-tight text-ink">
           {TOOLS.find((entry) => entry.id === tool)?.label ?? 'Tools'}

@@ -8,6 +8,7 @@ import { registerTabIpc } from './ipc/register-tab-ipc.js';
 import { registerSettingsIpc } from './ipc/register-settings-ipc.js';
 import type { IpcContractError } from './ipc/contract-guard.js';
 import { popupTabMenu } from './menus/tab-menu.js';
+import { panelsWithIcon } from './panels/panel-icons.js';
 import { loadBlocker, type BlockerHandle } from './privacy/adblock.js';
 import { buildUserAgent, UPDATE_FEED_URL, type BrowserIdentity } from './privacy/policies.js';
 import { clearBrowsingData } from './privacy/session-hardening.js';
@@ -16,6 +17,8 @@ import { normalizeUrl } from '../shared/url.js';
 import { defaultTileTitle } from './speed-dial.js';
 import { Updater } from './updates/updater.js';
 import { FaviconCache } from './favicons/favicon-cache.js';
+import { IconDecoder } from './favicons/icon-decoder.js';
+import { backfillIcons } from './favicons/icon-backfill.js';
 import { HistoryStore } from './history/history-store.js';
 import { Vault } from './account/vault.js';
 import { LocalModel } from './assistant/local-model.js';
@@ -64,6 +67,7 @@ const windows = new Map<number, VelaWindow>();
 let settings: SettingsStore | null = null;
 let blocker: BlockerHandle | null = null;
 let favicons: FaviconCache | null = null;
+let iconDecoder: IconDecoder | null = null;
 let updater: Updater | null = null;
 let history: HistoryStore | null = null;
 let vault: Vault | null = null;
@@ -185,7 +189,16 @@ if (!app.requestSingleInstanceLock()) {
 
     history = new HistoryStore();
     vault = new Vault();
-    favicons = new FaviconCache(app.getPath('userData'), true);
+    iconDecoder = new IconDecoder();
+    favicons = new FaviconCache(app.getPath('userData'), true, iconDecoder);
+    // Anything saved for a site before its icon was known — a bookmark added
+    // while the page was still loading, a docked site that serves no
+    // /favicon.ico — gets it now rather than keeping a letter for good.
+    favicons.onCached = (origin, icon) => {
+      if (settings === null) return;
+      const patch = backfillIcons(settings.current, origin, icon);
+      if (patch !== null) settings.update(patch);
+    };
     await favicons.load();
     blocker = await loadBlocker(RESOURCES_DIR);
 
@@ -209,22 +222,38 @@ if (!app.requestSingleInstanceLock()) {
       getManager: (sender) => windowFor(sender)?.manager ?? null,
       getPanels: (sender) => windowFor(sender)?.panels ?? null,
       findPanel: (id) => settings?.current.webPanels.find((panel) => panel.id === id) ?? null,
-      addPanel: (url, title) => {
+      addPanel: (url, title, sender) => {
         if (settings === null) return;
         const normalized = normalizeUrl(url);
         if (normalized === null) return;
         const existing = settings.current.webPanels;
         if (existing.some((panel) => panel.url === normalized) || existing.length >= 12) return;
+
+        const id = randomUUID();
+        const cached = favicons?.get(normalized) ?? null;
         settings.update({
           webPanels: [
             ...existing,
             {
-              id: randomUUID(),
+              id,
               url: normalized,
               title: title.trim() === '' ? defaultTileTitle(normalized) : title,
-              icon: favicons?.get(normalized) ?? null,
+              icon: cached,
             },
           ],
+        });
+
+        // A rail you read at a glance is the whole reason to dock a site there,
+        // and "G" in a square is not that. Nothing has loaded the site yet, so
+        // there is no icon to have noticed — ask it for one, through the same
+        // hardened session the panel itself will use.
+        if (cached !== null) return;
+        const owner = windowFor(sender);
+        if (owner === null) return;
+        void favicons?.resolveDefault(normalized, owner.session).then((dataUrl) => {
+          if (dataUrl === null || settings === null) return;
+          const next = panelsWithIcon(settings.current.webPanels, id, dataUrl);
+          if (next !== null) settings.update({ webPanels: next });
         });
       },
       removePanel: (id) => {
@@ -428,6 +457,9 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('window-all-closed', () => {
+    // The icon decoder's renderer is not a window, so nothing here waited on it.
+    iconDecoder?.dispose();
+
     if (PLATFORM !== 'darwin') {
       void clearOnExitIfRequested().finally(() => {
         app.quit();

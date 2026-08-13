@@ -32,6 +32,19 @@ export function useContentInsets(ref: RefObject<HTMLElement | null>): void {
 
     const measure = (): void => {
       frame = 0;
+
+      /*
+       * An element with no box has not been laid out — it is display:none, or
+       * detached, or in a frame that has not had one yet. Its rect is all
+       * zeros, which as insets reads as "the page fills the whole window" and
+       * would resize the page view to nothing and paint over Vela's chrome on
+       * the way. There is no window in which that is the right answer, so it is
+       * never reported; the last real measurement stands until there is a new
+       * one, which is what a hidden region wants anyway.
+       */
+      const box = element.getClientRects().length;
+      if (box === 0) return;
+
       const next = insetsFor(element);
       if (last !== null && same(last, next)) return;
       last = next;
