@@ -167,3 +167,7 @@ One spacing unit is 8px (`--spacing: 0.5rem`), so every integer Tailwind spacing
 `release.yml` fires on a `v*` tag: it runs the same gates, then builds installers on all three platforms and attaches them to the Release. It is the only thing that can produce the macOS `.dmg` and the Linux `.AppImage` — a `.dmg` can only be made on macOS, and neither target cross-compiles from Windows, so 0.1.0 shipped Windows-only for want of a runner. `npm run verify` and `npm run test:e2e` remain the local gates.
 
 The landing page is not deployed from the workflow. Pages serves `docs/` straight off `main`, so a push that touches the page is live within a minute or two of landing.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
