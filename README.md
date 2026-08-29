@@ -34,7 +34,7 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 - **A page context menu** that changes with what you right-clicked: save a link, image, video or audio file, copy an address, open it in a new tab, or search your selection with the engine you chose. Native rather than drawn by the chrome, because an OS menu floats above the page where an HTML one would be painted underneath it. What goes in it is `buildPageMenu`, which is plain data and unit tested.
 - **Workspaces**: named tab groups. Leaving one suspends its tabs, so an idle workspace costs storage for its titles and nothing else.
 - **Speed Dial** new tab page with locally cached favicons.
-- **Bookmarks** with a bar, **local history** that feeds the command palette, and **downloads** in a bubble that raises itself over the top right of the page as a file lands.
+- **Bookmarks** with a bar, **local history** that feeds the command palette, and **downloads** in a bubble that raises itself over the top right of the page as a file lands — with a rate, a time remaining, and pause/resume where the server will honour it.
 - **Per-site zoom** that sticks (`Ctrl+=` / `Ctrl+-` / `Ctrl+0`).
 - **Command palette** (`Ctrl+K`), a **sidebar** (`Ctrl+B`) holding the assistant, notes and the sites you dock, and **bang shortcuts** (`!gh`, `!yt`, `!w`) resolved on this machine.
 - **Private windows** (`Ctrl+Shift+N`) on a memory-only session.
@@ -45,6 +45,8 @@ Everything Vela remembers lives in one local JSON file. The settings panel print
 The sidebar assistant defaults to **a model running inside Vela itself**. Nothing to install, no second program, and no port to talk to: llama.cpp is linked into the process, so a question never becomes a network request in the first place. That is a stronger claim than "the request only goes to localhost" — there is no request.
 
 Vela ships without a model on purpose. A four-gigabyte GGUF inside the installer would be a miserable download for everyone who never opens the assistant, and it would ride along in every update after. So Settings → Assistant offers a short catalogue with sizes, and the one you pick downloads once — resumable, and checked against its SHA-256 before it is used, because a truncated GGUF fails somewhere deep inside llama.cpp rather than saying "the download did not finish".
+
+A transfer that size is minutes long, so it is treated as one. It retries with a widening wait and resumes from the part file rather than starting again, because a connection that drops once in ten minutes is ordinary and everything needed to carry on is already on disk; the digest at the end is what makes resuming safe. It asks whether there is room before it starts, so running out of space is a sentence rather than a write error in the fourth gigabyte. And it reports itself ten times a second instead of once per chunk — the old behaviour sent sixty-five thousand IPC messages and as many React renders over a single model, which made the panel stutter while the thing it described sat waiting on the network.
 
 Only the CPU build of llama.cpp is shipped. The CUDA and Vulkan binaries are 163 MB and 95 MB against 46 for CPU, which would quadruple the installer for hardware most people do not have.
 
@@ -68,7 +70,43 @@ It is careful about what it touches: never a page showing two password boxes (th
 
 A sign-in page can still refuse you for reasons Vela does not control — a second factor, a code from your phone, a "was this you?" challenge. Vela fills and submits; it does not pretend to answer those.
 
-**Google will not sign you in, and that is not something Vela can fix.** `accounts.google.com` accepts a short list of browsers and refuses the rest with "This browser or app may not be secure" — before it looks at anything you typed. Vela sends a plain Chrome user agent and the matching client hints, so the page loads and every header-level check passes; Google's check is not in the headers. One version went further and restored the parts of Chrome's JavaScript surface Electron omits — the `window.chrome` members, the `Google Chrome` brand in `navigator.userAgentData` — verified present in the page at document-start, with `navigator.webdriver` false beside them. Google refused the same address at the same step regardless, so that guess has been removed: it bought nothing and cost every tab a debugger attachment and a lie about what browser it was. What Vela does instead is recognise the refusal, say plainly that it is Google's decision and not a password problem, and offer to reopen the page in your usual browser. The rest of Google — Gmail, Drive, Calendar, search — works normally once you have a session.
+**Google sign-in.** `accounts.google.com` checks the browser before it looks at anything you
+typed, and for a long time refused Vela with "This browser or app may not be secure". The user
+agent and the client hints were never the problem — both said Chrome and both were believed. What
+gave Vela away was `window.chrome`: Electron defines it as an empty object, every real Chrome hangs
+`loadTimes`, `csi` and `app` off it, and an empty one beside a Chrome user agent is exactly what
+that check reads. Vela fills those three in at document-start.
+
+That the three members are the right ones is verified, and verified where it counts. `npm run
+verify:surface` launches plain Electron with nothing else attached, opens a real cross-origin popup
+— the shape every "Sign in with …" button takes — and asks each document what its own first inline
+script could see. A tab and a cross-origin popup both see `app,csi,loadTimes`, the `Google Chrome`
+brand, and `en-US,en`. What is _not_ claimed here is that this is sufficient for Google today:
+that can only be established by signing in, and it is the one thing the checks in this repository
+cannot do for you.
+
+The popup path is worth its own paragraph, because it was quietly racy. A tab can wait — nothing
+is asked of it until Vela calls `loadUrl`, so the load is chained behind the surface being in
+place. A popup cannot: Electron creates the window, starts the navigation `window.open` asked for,
+and only then hands it over, so a script registered at that point is registered for the _next_
+document. Whether it won came down to how long the navigation took, which meant a cross-process
+popup usually passed and a same-origin one usually did not. Vela now holds the popup's navigation
+and re-issues it behind the surface, carrying the referrer and any post body across, so it no
+longer depends on the timing. `window.opener` survives, which every OAuth SDK needs.
+
+A previous version concluded all of this was unfixable, having restored the same surface and been
+refused anyway. That experiment ran through an automation harness that set `navigator.webdriver`
+to true, which Google rejects on its own whatever else is on the page — so the result said nothing
+about the surface, and working code was deleted on the strength of it. The same trap caught the
+popup work later: measured under Playwright, whose own CDP auto-attach supersedes a per-WebContents
+script registration, the popup looks broken no matter what Vela does. That is why the surface check
+is a standalone script and not an e2e test, and why the e2e suite carries a marker saying so
+instead of an assertion it cannot honestly make. A negative result from a harness is a result about
+the harness until you have shown otherwise.
+
+The refusal banner remains, for the day this changes back. Vela notices the refusal, says plainly
+that it is the browser being turned away rather than a password problem, and offers to reopen the
+page in your usual browser.
 
 ### Web panels
 
@@ -144,7 +182,21 @@ A site docked into the sidebar is the one case where nothing has loaded the page
 
 `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, `webSecurity: true` — asserted by unit tests on every platform, and by an E2E test that confirms `require`, `process` and `ipcRenderer` are all absent from the renderer.
 
-**Browser identity.** Every install on a platform sends the same plain Chrome user agent, naming neither Vela nor Electron — randomising it per install would be a fingerprint, not a defence. The client hints have to say the same thing, and Electron sends none of them at all: Chromium only emits `Sec-CH-UA` for an embedder that supplies user-agent metadata, and Electron exposes no way to. That leaves a browser claiming `Chrome/150` in its user agent and sending no brand list whatsoever, which no real Chrome has ever done and which a sign-in front end reads as an embedded webview. Vela sends the three low-entropy hints Chrome sends unprompted, derived from the same platform and version the user agent is built from, and aligns any brand list Chromium does send so both halves name Chrome. The higher-entropy hints are never volunteered, and nothing is sent to a plain-http origin. An e2e test asserts on what a real page request actually receives, rather than on the string Vela meant to send.
+**Browser identity.** Every install on a platform sends the same plain Chrome user agent, naming
+neither Vela nor Electron — randomising it per install would be a fingerprint, not a defence. The
+other two halves have to say the same thing. Electron sends no client hints at all, so Vela sends
+the three low-entropy ones Chrome sends unprompted; the higher-entropy ones are never volunteered,
+even when a site asks for them via `Accept-CH`, and nothing is sent to a plain-http origin. In the
+page, Vela fills in the parts of Chrome’s JavaScript that Electron omits — the three `window
+.chrome` members, and the brand list on `navigator.userAgentData` so it names the same brands the
+`Sec-CH-UA` header just sent. The brand list and the header are built from one array for that
+reason: a browser whose header claims Chrome while its JavaScript denies it is a combination
+nothing else on the web produces, which makes the disagreement itself the identifying bit. The
+script is injected at document-start over the devtools protocol, because a preload runs in the
+isolated world and `contextIsolation` is not a flag Vela trades away. Languages are fixed at
+`en-US,en` rather than read from the OS, for the same reason as the user agent. An e2e test
+asserts on what a real page actually receives and on what a real page can actually see, rather
+than on the strings Vela meant to send.
 
 **Signing in.** A "Sign in with …" button calls `window.open` with window features, keeps the handle it gets back, and waits for the popup to answer through `window.opener`. Vela follows Chrome's own rule: features mean a real popup window, no features mean a tab. The popup carries the same four non-negotiable flags a tab does and no preload, and dies with the tab that opened it. `Referer` is trimmed rather than removed — another origin learns which site you came from and never which page, which is what Chrome and Firefox both do by default, and leaves the origin that CSRF middleware falls back to when a login POSTs across origins.
 

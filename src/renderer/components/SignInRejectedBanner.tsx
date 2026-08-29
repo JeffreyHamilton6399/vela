@@ -9,10 +9,10 @@ import type { TabSnapshot } from '../../shared/types/ipc.js';
  * secure. It is neither a bug nor a password problem, and the honest thing is
  * to say which it is and hand over the way round it.
  *
- * Google's refusal is not a check Vela can pass — see rejection.ts for what was
- * tried and what it cost. The copy says so plainly rather than implying a fix
- * is coming, and the button is the one thing that actually works: the same
- * address, in the browser Google already trusts.
+ * Vela passes Google's check as of the browser-surface work in policies.ts, so
+ * this should not appear on a current build. It stays for the day a site
+ * changes what it reads: the copy no longer says the refusal is permanent, and
+ * the button is still the thing that works in the meantime.
  */
 export function SignInRejectedBanner({ tab }: { tab: TabSnapshot | null }): JSX.Element | null {
   const service = tab?.signInRejectedBy ?? null;
@@ -25,11 +25,11 @@ export function SignInRejectedBanner({ tab }: { tab: TabSnapshot | null }): JSX.
     >
       <span className="min-w-0 flex-1 text-ink-muted">
         <strong className="font-medium text-ink">
-          {service} does not allow sign-in from browsers it does not recognise.
+          {service} would not accept this browser just now.
         </strong>{' '}
         Nothing is wrong with your password — {service} checks the browser before it checks anything
-        you typed, and it only accepts a short list of them. That is {service}&rsquo;s decision, not
-        a fault Vela can fix. Sign in with your usual browser; the rest of {service} works here.
+        you typed, and this time it said no. Vela normally passes that check, so this is worth
+        reporting. Meanwhile you can finish signing in with your usual browser.
       </span>
 
       <button

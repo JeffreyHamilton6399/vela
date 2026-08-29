@@ -4,13 +4,23 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @theme {
-  /* Near-white / near-black surfaces. */
-  --color-surface: #fafafa;
+  /*
+   * Two surfaces, and they have to be told apart.
+   *
+   * `surface` is the chrome — titlebar, toolbar, rail — and `raised` is the
+   * page and anything that floats on the chrome as a card. They were #fafafa
+   * and #ffffff, two per cent apart, which meant the page had no edge: the
+   * rounded corners and the gap around it were being drawn and were invisible,
+   * and the only thing separating the rail from the page was a hairline rule.
+   * The chrome is now grey enough to read as a frame around a white page,
+   * which is the whole shape the layout is built on.
+   */
+  --color-surface: #f1f2f4;
   --color-raised: #ffffff;
-  --color-line: #dbdbdb;
+  --color-line: #d8dade;
   --color-ink: #171717;
-  --color-ink-muted: #737373;
-  --color-hover: #efefef;
+  --color-ink-muted: #6b7076;
+  --color-hover: #e3e5e9;
   --color-danger: #ed4956;
 
   /* Strict 8px grid: one spacing unit IS 8px, so `p-2` is 16px, `h-5` is 40px.
@@ -32,16 +42,23 @@
      the active tab indicator (stage 3) and focus rings. */
   --vela-gradient: linear-gradient(135deg, #8b5cf6 0%, #e1306c 55%, #f59e0b 100%);
   --titlebar-height: 40px;
+  /*
+   * The page card's corner. The native view that draws the page rounds itself
+   * from PAGE_RADIUS in main/tabs/layout.ts, and every element that frames or
+   * sits beside that view reads it from here, so the two cannot drift.
+   */
+  --page-radius: 10px;
   color-scheme: light dark;
 }
 
 [data-theme='dark'] {
-  --color-surface: #0a0a0a;
-  --color-raised: #171717;
-  --color-line: #262626;
+  /* Same relationship inverted: the chrome recedes and the page sits above it. */
+  --color-surface: #0c0d0f;
+  --color-raised: #1a1b1e;
+  --color-line: #2a2c31;
   --color-ink: #fafafa;
-  --color-ink-muted: #a3a3a3;
-  --color-hover: #262626;
+  --color-ink-muted: #9aa0a8;
+  --color-hover: #26282d;
 }
 
 @layer base {

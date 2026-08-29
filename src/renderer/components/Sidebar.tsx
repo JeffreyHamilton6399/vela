@@ -144,7 +144,14 @@ export function Sidebar({
   onClose,
 }: SidebarProps): JSX.Element {
   return (
-    <aside aria-label="Sidebar tools" className={`flex h-full flex-col gap-2 p-2 ${SIDEBAR_FRAME}`}>
+    // No `h-full`: the frame carries margins now, and a full-height box plus a
+    // margin is taller than the row it sits in — which pushed the footer out
+    // through the bottom of the card and onto the chrome behind it. Stretching
+    // is the flex row's default and already does the right thing.
+    <aside
+      aria-label="Sidebar tools"
+      className={`flex min-h-0 flex-col gap-2 p-2 ${SIDEBAR_FRAME}`}
+    >
       <div className="flex items-center justify-between gap-1">
         <h2 className="text-[13px] font-semibold tracking-tight text-ink">
           {TOOLS.find((entry) => entry.id === tool)?.label ?? 'Tools'}

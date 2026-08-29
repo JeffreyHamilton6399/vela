@@ -1,6 +1,10 @@
 import type { BrowserWindow, WindowOpenHandlerResponse } from 'electron';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
-import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
+import {
+  applyBrowserSurfaceToPopup,
+  applyWebRtcPolicy,
+  type PopupNavigation,
+} from '../privacy/session-hardening.js';
 
 /**
  * A `window.open` that asked for a sized window, which is Chrome's popup
@@ -46,6 +50,8 @@ export interface PopupOptions {
   vetNavigation: (url: string) => { url: string } | { interstitial: string } | null;
   /** A link in the popup that wants a tab: it lands in the opener's window. */
   openInNewTab: (url: string) => void;
+  /** What `window.open` asked for, so the surface can get in front of it. */
+  opened: PopupNavigation;
 }
 
 /**
@@ -56,6 +62,11 @@ export interface PopupOptions {
 export function configurePopup(window: BrowserWindow, options: PopupOptions): void {
   const contents = window.webContents;
   applyWebRtcPolicy(contents);
+  // This window is already navigating, so the surface cannot simply be
+  // registered beside it — see applyBrowserSurfaceToPopup, which holds that
+  // navigation and re-issues it. A sign-in popup is the one window in Vela
+  // where the surface has to be right.
+  applyBrowserSurfaceToPopup(contents, options.opened);
 
   contents.on('will-navigate', (event, url) => {
     const verdict = options.vetNavigation(url);

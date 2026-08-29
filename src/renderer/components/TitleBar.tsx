@@ -30,7 +30,7 @@ export function TitleBar({
 
   return (
     <header
-      className={`drag flex h-5 shrink-0 items-center gap-1 border-b border-line bg-raised pr-0 transition-opacity duration-200 ${
+      className={`drag flex h-5 shrink-0 items-center gap-1 bg-surface pr-0 transition-opacity duration-200 ${
         focused ? 'opacity-100' : 'opacity-60'
       } ${isMac ? 'pl-10' : 'pl-1'}`}
     >

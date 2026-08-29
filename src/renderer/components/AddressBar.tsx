@@ -89,7 +89,7 @@ export function AddressBar({
 
   return (
     <form
-      className="no-drag focus-ring flex h-4 min-w-0 flex-1 items-center gap-1 rounded-full border border-line bg-surface px-2 transition-colors duration-150 focus-within:bg-raised"
+      className="no-drag focus-ring flex h-4 min-w-0 flex-1 items-center gap-1 rounded-full border border-line bg-raised px-2 transition-colors duration-150 hover:border-ink-muted/40 focus-within:border-ink-muted/60"
       onSubmit={(event) => {
         event.preventDefault();
         onNavigate(value);

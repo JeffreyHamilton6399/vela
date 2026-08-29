@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "verify": "npm run typecheck && npm run lint && npm run test",
+    "verify:surface": "node scripts/verify-surface.mjs",
     "prebuild": "node scripts/make-icon.mjs && node scripts/fetch-filters.mjs --if-missing",
     "filters:update": "node scripts/fetch-filters.mjs",
     "package": "npm run build && electron-builder --publish never",

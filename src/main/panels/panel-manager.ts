@@ -5,9 +5,13 @@ import {
   type Session,
   type WebContents,
 } from 'electron';
-import type { Bounds } from '../tabs/layout.js';
+import { PAGE_RADIUS, type Bounds } from '../tabs/layout.js';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
-import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
+import {
+  applyBrowserSurface,
+  applyWebRtcPolicy,
+  releaseBrowserSurface,
+} from '../privacy/session-hardening.js';
 
 export interface PanelManagerOptions {
   window: BrowserWindow;
@@ -67,7 +71,10 @@ export class PanelManager {
     const view = this.views.get(id);
     if (view === undefined) return;
     this.views.delete(id);
-    if (!view.webContents.isDestroyed()) view.webContents.close();
+    if (!view.webContents.isDestroyed()) {
+      releaseBrowserSurface(view.webContents);
+      view.webContents.close();
+    }
   }
 
   setBounds(bounds: Bounds | null): void {
@@ -105,7 +112,10 @@ export class PanelManager {
     });
 
     view.setBackgroundColor('#ffffff');
+    // Same corner as a tab's page: a docked site is a card on the chrome too.
+    view.setBorderRadius(PAGE_RADIUS);
     applyWebRtcPolicy(view.webContents);
+    const surface = applyBrowserSurface(view.webContents, { prime: true });
 
     // Links that want a new window become real tabs, not nested panels.
     view.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -124,9 +134,15 @@ export class PanelManager {
       this.options.onContextMenu(view.webContents, params);
     });
 
-    void view.webContents.loadURL(url).catch(() => {
-      // A panel that fails to load shows the page's own error, as a tab would.
-    });
+    // Same wait a tab's first load takes: a docked Gmail or Calendar is a page
+    // that has to sign in, so it needs Chrome's JavaScript surface in place
+    // before its first document exists.
+    void surface
+      .ready()
+      .then(() => (view.webContents.isDestroyed() ? undefined : view.webContents.loadURL(url)))
+      .catch(() => {
+        // A panel that fails to load shows the page's own error, as a tab would.
+      });
 
     this.views.set(id, view);
     return view;
@@ -136,7 +152,10 @@ export class PanelManager {
     this.disposed = true;
     this.close();
     for (const view of this.views.values()) {
-      if (!view.webContents.isDestroyed()) view.webContents.close();
+      if (!view.webContents.isDestroyed()) {
+        releaseBrowserSurface(view.webContents);
+        view.webContents.close();
+      }
     }
     this.views.clear();
   }

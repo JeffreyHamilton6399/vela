@@ -228,8 +228,9 @@ export class TabManager {
         onOpenInNewTab: (url, opener) => {
           this.create({ url, active: true, openerId: opener.id });
         },
-        onOpenPopup: (popup) => {
+        onOpenPopup: (popup, opened) => {
           configurePopup(popup, {
+            opened,
             vetNavigation: (url) => this.vetNavigation(url),
             openInNewTab: (url) => {
               this.create({ url, active: true });

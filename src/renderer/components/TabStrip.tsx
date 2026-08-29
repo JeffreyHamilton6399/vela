@@ -94,9 +94,10 @@ const TabItem = memo(
         // push from main mid-gesture cannot clobber either.
         style={{ width }}
         className={`no-drag focus-ring group relative flex h-4 shrink-0 items-center gap-1 rounded-tab px-1 transition-[background-color,opacity,box-shadow] duration-150 ${
-          // The active tab lifts off the strip rather than only changing colour:
-          // in dark mode the surface/raised difference alone is nearly invisible.
-          active ? 'bg-surface shadow-[0_1px_3px_rgb(0_0_0/0.10)]' : 'hover:bg-hover'
+          // The active tab is the same colour as the page it opens onto, so
+          // the two read as one surface, and it lifts off the strip with a
+          // shadow because in dark mode colour alone is nearly invisible.
+          active ? 'bg-raised shadow-[0_1px_3px_rgb(0_0_0/0.10)]' : 'hover:bg-hover'
         } ${dragging ? 'z-10 cursor-grabbing opacity-95 shadow-[0_6px_16px_rgb(0_0_0/0.18)]' : ''}`}
         onPointerDown={(event) => {
           onPointerDown(event, tab);

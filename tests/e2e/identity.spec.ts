@@ -32,6 +32,7 @@ test.beforeAll(async () => {
       response.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
       return;
     }
+
     documentHeaders = { ...request.headers };
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(
       // Client hints ride on subresource requests, so the page makes one.
@@ -180,4 +181,77 @@ test('a cross-origin login POST still carries an origin to check', async () => {
 
   // The origin the form came from, and nothing after it.
   expect(loginHeaders['referer']).toBe(`${origin}/`);
+});
+
+/**
+ * The JavaScript half of the same claim.
+ *
+ * Electron defines `window.chrome` as an empty object. Every real Chrome hangs
+ * `loadTimes`, `csi` and `app` off it, and an empty one beside a Chrome user
+ * agent is the check Google's sign-in actually makes: with these three missing,
+ * accounts.google.com refuses the address before it looks at the password.
+ *
+ * Asserted on the page rather than on the script Vela built for itself. The
+ * script only counts if it arrives at document-start, and registering it
+ * without enabling the devtools Page domain first silently does nothing —
+ * which from the main process looks exactly like success.
+ */
+test('a page sees the parts of Chrome that Electron leaves out', async () => {
+  const surface: unknown = await app.evaluate(({ webContents }) => {
+    const page = webContents
+      .getAllWebContents()
+      .find((contents) => contents.getURL().includes('/echo'));
+
+    return (
+      page?.executeJavaScript(
+        `JSON.stringify({
+          members: Object.keys(window.chrome ?? {}).sort(),
+          brands: (navigator.userAgentData?.brands ?? []).map((entry) => entry.brand),
+          languages: navigator.languages,
+        })`,
+      ) ?? null
+    );
+  });
+
+  const seen = JSON.parse(String(surface)) as {
+    members: string[];
+    brands: string[];
+    languages: string[];
+  };
+
+  expect(seen.members).toEqual(['app', 'csi', 'loadTimes']);
+
+  // The brand list the page reports has to be the one the headers sent. A
+  // browser whose header names Chrome while its JavaScript denies it is a
+  // combination nothing else produces, so the disagreement is the fingerprint.
+  expect(seen.brands).toContain('Google Chrome');
+  expect(String(subresourceHeaders['sec-ch-ua'])).toContain('"Google Chrome"');
+
+  // Chrome asks for a language and its base language. Electron's own default
+  // is a bare `en-US`, which no Chrome has ever sent.
+  expect(seen.languages).toEqual(['en-US', 'en']);
+  expect(documentHeaders['accept-language']).toBe('en-US,en;q=0.9');
+});
+
+/**
+ * The popup half of the surface is deliberately NOT asserted here.
+ *
+ * It cannot be, from inside this harness. The surface is installed over the
+ * devtools protocol, and Playwright drives Electron over the same protocol,
+ * auto-attaching to each new target as it appears. Its attachment supersedes a
+ * per-WebContents script registration, so a popup measured from here reports an
+ * empty `window.chrome` whatever Vela did — the result is about the harness.
+ *
+ * That mistake has already been made twice in this repository, once expensively
+ * enough to delete working code. So the popup is checked where it can be
+ * checked honestly, by `npm run verify:surface`, which launches plain Electron
+ * with nothing else attached and asks a real cross-origin popup what its own
+ * first inline script could see.
+ *
+ * The tab case above is unaffected: its script is registered before the view has
+ * a document at all, which is early enough to win even here.
+ */
+test('the popup surface is verified outside this harness', () => {
+  // A marker, so the gap is visible in the suite rather than merely absent.
+  expect(true).toBe(true);
 });

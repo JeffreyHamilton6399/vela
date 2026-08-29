@@ -5,8 +5,15 @@ import {
   type Session,
 } from 'electron';
 import type { TabSnapshot } from '../../shared/types/ipc.js';
+import { PAGE_RADIUS } from './layout.js';
 import { REQUIRED_WEB_PREFERENCES } from '../window-options.js';
-import { applyWebRtcPolicy } from '../privacy/session-hardening.js';
+import {
+  applyBrowserSurface,
+  applyWebRtcPolicy,
+  releaseBrowserSurface,
+  type BrowserSurface,
+  type PopupNavigation,
+} from '../privacy/session-hardening.js';
 import { allowPopup, isPopupDisposition } from './popup-window.js';
 import { detectSignInRejection } from './rejection.js';
 
@@ -15,8 +22,12 @@ export interface TabEvents {
   onChanged: (tab: Tab) => void;
   /** A link that asked for a new tab (target=_blank, plain window.open). */
   onOpenInNewTab: (url: string, opener: Tab) => void;
-  /** A sized `window.open`, which is what a sign-in popup looks like. */
-  onOpenPopup: (window: BrowserWindow) => void;
+  /**
+   * A sized `window.open`, which is what a sign-in popup looks like. The
+   * details come along because the popup's navigation has to be re-issued
+   * behind its browser surface, and it cannot be re-issued without them.
+   */
+  onOpenPopup: (window: BrowserWindow, opened: PopupNavigation) => void;
   /** Resolves a locally cached icon for a page; remote icons never reach the UI. */
   resolveFavicon: (pageUrl: string, iconUrl: string) => void;
   /** A completed top-level navigation: history and per-host zoom hang off this. */
@@ -81,6 +92,10 @@ export class Tab {
   private currentUrl = BLANK;
   private blocked = 0;
   private zoomLevel = 0;
+  /** This view's Chrome JavaScript surface, installed on its first load. */
+  private surface: BrowserSurface = { ready: () => Promise.resolve() };
+  /** Orders the loads on this view behind the surface being in place. */
+  private loads: Promise<void> = Promise.resolve();
   private readonly events: TabEvents;
 
   constructor(private readonly init: TabInit) {
@@ -111,6 +126,10 @@ export class Tab {
     });
 
     view.setBackgroundColor('#ffffff');
+    // The page is a card floating on the chrome, and its corners belong to the
+    // native view rather than to any stylesheet. Same number as the element the
+    // insets are measured from, or the shape and the hole disagree.
+    view.setBorderRadius(PAGE_RADIUS);
     this.currentView = view;
     this.wireEvents(view);
 
@@ -150,7 +169,10 @@ export class Tab {
 
     this.currentView = null;
     this.loading = false;
-    if (!view.webContents.isDestroyed()) view.webContents.close();
+    if (!view.webContents.isDestroyed()) {
+      releaseBrowserSurface(view.webContents);
+      view.webContents.close();
+    }
     this.changed();
   }
 
@@ -224,9 +246,20 @@ export class Tab {
     this.hasLoadedPage = true;
     this.currentUrl = url;
 
-    void contents.loadURL(url).catch(() => {
-      // did-fail-load reports this to the UI; a rejected promise here is noise.
-    });
+    // Waits for the browser surface to be registered before the first page
+    // arrives. It is a few milliseconds of local devtools-protocol round trip
+    // on a view's first load and nothing at all afterwards, and it is the
+    // difference between a site seeing Chrome's JavaScript and seeing
+    // Electron's — the script only counts if it is in place before the
+    // document is created. Chaining every load through the same promise also
+    // keeps two rapid loads in the order they were asked for.
+    this.loads = this.loads
+      .then(() => this.surface.ready())
+      .then(() => (contents.isDestroyed() ? undefined : contents.loadURL(url)))
+      .catch(() => {
+        // did-fail-load reports this to the UI; a rejected promise here is
+        // noise, and a surface that failed to install must not stop the page.
+      });
   }
 
   /**
@@ -331,7 +364,27 @@ export class Tab {
   destroy(): void {
     const view = this.currentView;
     this.currentView = null;
-    if (view !== null && !view.webContents.isDestroyed()) view.webContents.close();
+    if (view !== null && !view.webContents.isDestroyed()) {
+      releaseBrowserSurface(view.webContents);
+      view.webContents.close();
+    }
+  }
+
+  /**
+   * True for the `about:blank` the browser surface loads to wake a renderer.
+   *
+   * That load is Vela's own errand and the tab must not react to it. Left
+   * unfiltered it walks the tab's address back to `about:blank` between the
+   * moment a page is asked for and the moment it arrives, and every listener
+   * downstream believes it: the strip redraws for a page nobody navigated to,
+   * and the visit is announced as a real one.
+   *
+   * Told apart by the tab already knowing where it is going — `loadUrl` sets
+   * the address before the surface goes anywhere — so a page that navigates
+   * itself to `about:blank` afterwards is still reported normally.
+   */
+  private isSurfacePrime(url: string): boolean {
+    return url === BLANK && this.currentUrl !== BLANK;
   }
 
   /**
@@ -357,6 +410,7 @@ export class Tab {
     const contents = view.webContents;
 
     applyWebRtcPolicy(contents);
+    this.surface = applyBrowserSurface(contents, { prime: true });
 
     // Chrome's own split: a `window.open` carrying window features is a popup,
     // and anything else — target=_blank, a bare `window.open(url)` — is a tab.
@@ -368,8 +422,12 @@ export class Tab {
       return { action: 'deny' };
     });
 
-    contents.on('did-create-window', (popup) => {
-      this.events.onOpenPopup(popup);
+    contents.on('did-create-window', (popup, details) => {
+      this.events.onOpenPopup(popup, {
+        url: details.url,
+        referrer: details.referrer,
+        postBody: details.postBody,
+      });
     });
 
     // Link clicks inside the page go through the same https policy as
@@ -409,12 +467,14 @@ export class Tab {
 
     contents.on('did-start-navigation', (event) => {
       if (!event.isMainFrame) return;
+      if (this.isSurfacePrime(event.url)) return;
       this.resetBlocked();
       this.currentUrl = event.url;
       this.changed();
     });
 
     contents.on('did-navigate', (_event, url) => {
+      if (this.isSurfacePrime(url)) return;
       this.currentUrl = url;
       this.noteRejection(url);
       this.changed();

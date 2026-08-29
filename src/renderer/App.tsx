@@ -240,11 +240,19 @@ export function App(): JSX.Element {
           }}
         />
 
-        {/* The page view is positioned over this element by the main process. */}
+        {/*
+          The page view is positioned over this element by the main process.
+
+          The margin is the whole of the "floating card" look: it is what the
+          inset measurement reports, so the page view lands inside it and the
+          chrome colour shows through around three of its edges. The fourth is
+          the tab strip, which the active tab joins onto — the page and its tab
+          are one surface, which is the point of the shape.
+        */}
         <div
           ref={contentRef}
           data-content-region
-          className="relative min-h-0 min-w-0 flex-1 bg-surface"
+          className="relative mr-[6px] mb-[6px] min-h-0 min-w-0 flex-1 rounded-[var(--page-radius)] bg-raised shadow-[0_1px_4px_rgb(0_0_0/0.08)]"
         >
           <ContentRegion tab={tab} settings={settings} />
 
@@ -305,7 +313,7 @@ export function App(): JSX.Element {
           <aside
             ref={sidebarRef}
             aria-label="Web panel"
-            className="flex w-[340px] shrink-0 flex-col border-l border-line bg-raised"
+            className="mr-[6px] mb-[6px] ml-[6px] flex w-[340px] shrink-0 flex-col overflow-hidden rounded-[var(--page-radius)] bg-raised shadow-[0_1px_4px_rgb(0_0_0/0.08)]"
           >
             <div className="flex h-5 shrink-0 items-center justify-between gap-1 border-b border-line px-2">
               <span className="truncate text-[13px] font-semibold text-ink">
