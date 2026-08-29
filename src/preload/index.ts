@@ -225,6 +225,12 @@ const bridge: VelaBridge = {
     cancel(id: string): void {
       ipcRenderer.send(SEND_CHANNELS.downloadsCancel, { id });
     },
+    pause(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsPause, { id });
+    },
+    resume(id: string): void {
+      ipcRenderer.send(SEND_CHANNELS.downloadsResume, { id });
+    },
     clear(): void {
       ipcRenderer.send(SEND_CHANNELS.downloadsClear);
     },

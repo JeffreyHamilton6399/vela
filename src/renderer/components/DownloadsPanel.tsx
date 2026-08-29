@@ -33,6 +33,23 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit] ?? 'KB'}`;
 }
 
+/**
+ * How much longer, in units the number is actually good to.
+ *
+ * Nothing is said until there is a rate to divide by, and nothing finer than a
+ * minute is promised beyond the first one — an ETA that counts individual
+ * seconds through a ten-minute download is noise pretending to be information.
+ */
+function remaining(item: DownloadItem): string | null {
+  if (item.state !== 'progressing' || item.bytesPerSecond <= 0 || item.totalBytes <= 0) return null;
+
+  const seconds = Math.round((item.totalBytes - item.receivedBytes) / item.bytesPerSecond);
+  if (seconds <= 0) return null;
+  if (seconds < 60) return `${String(seconds)}s left`;
+  if (seconds < 3600) return `${String(Math.round(seconds / 60))} min left`;
+  return 'over an hour left';
+}
+
 function describe(item: DownloadItem): string {
   switch (item.state) {
     case 'completed':
@@ -40,13 +57,18 @@ function describe(item: DownloadItem): string {
     case 'cancelled':
       return 'Cancelled';
     case 'interrupted':
-      return 'Interrupted';
+      return item.canResume ? 'Interrupted — can be resumed' : 'Interrupted';
     case 'paused':
-      return 'Paused';
-    default:
-      return item.totalBytes > 0
-        ? `${formatBytes(item.receivedBytes)} of ${formatBytes(item.totalBytes)}`
-        : formatBytes(item.receivedBytes);
+      return `Paused — ${formatBytes(item.receivedBytes)} so far`;
+    default: {
+      const size =
+        item.totalBytes > 0
+          ? `${formatBytes(item.receivedBytes)} of ${formatBytes(item.totalBytes)}`
+          : formatBytes(item.receivedBytes);
+      const rate = item.bytesPerSecond > 0 ? `${formatBytes(item.bytesPerSecond)}/s` : null;
+      const left = remaining(item);
+      return [size, rate, left].filter((part) => part !== null).join(' · ');
+    }
   }
 }
 
@@ -63,15 +85,42 @@ function Row({ item }: { item: DownloadItem }): JSX.Element {
         </span>
 
         {running ? (
-          <button
-            type="button"
-            onClick={() => {
-              window.vela.downloads.cancel(item.id);
-            }}
-            className="focus-ring shrink-0 rounded-lg px-1 text-[11px] text-ink-muted hover:bg-hover hover:text-ink"
-          >
-            Cancel
-          </button>
+          <>
+            {/* Only offered where it will work: a server that will not do a
+                ranged request cannot resume, and Chromium says which. */}
+            {item.state === 'paused' ? (
+              item.canResume ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.vela.downloads.resume(item.id);
+                  }}
+                  className="focus-ring shrink-0 rounded-lg px-1 text-[11px] text-ink-muted hover:bg-hover hover:text-ink"
+                >
+                  Resume
+                </button>
+              ) : null
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  window.vela.downloads.pause(item.id);
+                }}
+                className="focus-ring shrink-0 rounded-lg px-1 text-[11px] text-ink-muted hover:bg-hover hover:text-ink"
+              >
+                Pause
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                window.vela.downloads.cancel(item.id);
+              }}
+              className="focus-ring shrink-0 rounded-lg px-1 text-[11px] text-ink-muted hover:bg-hover hover:text-ink"
+            >
+              Cancel
+            </button>
+          </>
         ) : (
           <>
             {item.state === 'completed' ? (

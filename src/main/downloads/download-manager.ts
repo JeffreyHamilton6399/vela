@@ -24,6 +24,11 @@ export interface DownloadEvents {
 export class DownloadManager {
   private items: DownloadItem[] = [];
   private readonly handles = new Map<string, ElectronDownloadItem>();
+  /**
+   * How to re-read each item. `updated` does not fire for a pause or a resume,
+   * so without this the list keeps showing the state the user just changed.
+   */
+  private readonly snapshots = new Map<string, () => DownloadItem>();
 
   constructor(
     session: Session,
@@ -55,7 +60,14 @@ export class DownloadManager {
       // it: an unrounded value fails validation on the way out, which took the
       // whole downloads list with it rather than just this field.
       startedAt: Math.round(item.getStartTime() * 1000),
+      bytesPerSecond: Math.max(0, Math.round(item.getCurrentBytesPerSecond())),
+      // Asked of Chromium rather than assumed: whether a transfer can be
+      // picked up again depends on the server honouring a ranged request, and
+      // a resume button that quietly does nothing is worse than no button.
+      canResume: item.canResume(),
     });
+
+    this.snapshots.set(id, snapshot);
 
     const started = snapshot();
     this.items = [started, ...this.items].slice(0, MAX_REMEMBERED);
@@ -73,7 +85,8 @@ export class DownloadManager {
     });
   }
 
-  private replace(id: string, next: DownloadItem): void {
+  private replace(id: string, next: DownloadItem | null): void {
+    if (next === null) return;
     this.items = this.items.map((item) => (item.id === id ? next : item));
     this.emit();
   }
@@ -99,6 +112,28 @@ export class DownloadManager {
     this.handles.get(id)?.cancel();
   }
 
+  /**
+   * Holds a download where it is, keeping what is already on disk.
+   *
+   * Worth having for the same reason the model downloads resume: the files a
+   * browser fetches are large enough that losing one to a closed laptop or a
+   * saturated connection is a real cost, and Chromium already tracks
+   * everything needed to carry on.
+   */
+  pause(id: string): void {
+    const item = this.handles.get(id);
+    if (item === undefined || item.isPaused()) return;
+    item.pause();
+    this.replace(id, this.snapshots.get(id)?.() ?? null);
+  }
+
+  resume(id: string): void {
+    const item = this.handles.get(id);
+    if (item === undefined || !item.isPaused() || !item.canResume()) return;
+    item.resume();
+    this.replace(id, this.snapshots.get(id)?.() ?? null);
+  }
+
   /** Clears the list. Files already on disk are left alone. */
   clear(): void {
     this.items = this.items.filter((item) => item.state === 'progressing');
@@ -107,6 +142,7 @@ export class DownloadManager {
 
   dispose(): void {
     this.handles.clear();
+    this.snapshots.clear();
     this.items = [];
   }
 }

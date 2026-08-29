@@ -10,6 +10,28 @@ export interface UpdaterOptions {
 }
 
 /**
+ * How many times a check will try, and how long it waits between.
+ *
+ * The release feed is a single GET to GitHub, and GitHub answers an
+ * unauthenticated caller with a rate limit often enough that a one-shot check
+ * reports "could not reach the release feed" for a service that is perfectly
+ * healthy. Telling someone their browser cannot check for updates, when the
+ * truth is that it should have waited two seconds, is the kind of small lie
+ * that makes a user stop believing the rest of the interface.
+ *
+ * Deliberately short. This runs while someone is looking at a settings panel,
+ * so it is worth a couple of seconds and is not worth a minute.
+ */
+const CHECK_ATTEMPTS = 3;
+const CHECK_BACKOFF_MS = 2000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
  * The only request Vela makes on its own behalf.
  *
  * It is a plain GET for the release feed: `autoDownload` is off, so nothing is
@@ -78,13 +100,36 @@ export class Updater {
     }
 
     this.set({ status: 'checking', version: null, message: null });
-    void autoUpdater.checkForUpdates().catch((error: unknown) => {
-      this.set({
-        status: 'error',
-        version: null,
-        message: error instanceof Error ? error.message : 'Could not reach the release feed.',
-      });
-    });
+    void this.checkWithRetries();
+  }
+
+  /**
+   * Asks the feed, giving a flaky answer a second chance before believing it.
+   *
+   * The result arrives on the `update-available` / `update-not-available`
+   * events rather than from the promise, so this only has to decide when to
+   * stop asking and what to say if it never worked.
+   */
+  private async checkWithRetries(): Promise<void> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await autoUpdater.checkForUpdates();
+        return;
+      } catch (error) {
+        // The user turned checks off, or closed the window, while this waited.
+        if (!this.options.isEnabled()) return;
+
+        if (attempt >= CHECK_ATTEMPTS) {
+          this.set({
+            status: 'error',
+            version: null,
+            message: error instanceof Error ? error.message : 'Could not reach the release feed.',
+          });
+          return;
+        }
+        await delay(CHECK_BACKOFF_MS * attempt);
+      }
+    }
   }
 
   /** Downloads only once the user has asked for it. */

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, rename, stat, unlink } from 'node:fs/promises';
+import { mkdir, rename, stat, statfs, unlink } from 'node:fs/promises';
 import { get } from 'node:https';
 import type { IncomingMessage } from 'node:http';
 import path from 'node:path';
@@ -26,7 +26,13 @@ import { findModel, type CatalogueEntry } from './catalogue.js';
 
 export type ModelStatus =
   | { state: 'absent' }
-  | { state: 'downloading'; receivedBytes: number; totalBytes: number }
+  | {
+      state: 'downloading';
+      receivedBytes: number;
+      totalBytes: number;
+      /** Recent throughput, smoothed. Zero until there is enough to say. */
+      bytesPerSecond: number;
+    }
   | { state: 'verifying' }
   | { state: 'ready' }
   | { state: 'failed'; error: string };
@@ -39,11 +45,48 @@ export interface ModelProgress {
 const PART_SUFFIX = '.part';
 const REDIRECT_LIMIT = 5;
 
+/**
+ * How often a download may report itself, in milliseconds.
+ *
+ * Without this the report went out on every chunk. A four-gigabyte model
+ * arriving in 64 KiB pieces is sixty-five thousand of them, each one a
+ * structured clone across the IPC boundary and a React render at the other
+ * end — enough to make the settings panel stutter while the thing it is
+ * describing does nothing but wait for the network. Ten a second is more than
+ * a progress bar can show and a fraction of a percent of the traffic.
+ */
+const PROGRESS_INTERVAL_MS = 100;
+
+/**
+ * How many times a download will pick itself back up, and how long it waits.
+ *
+ * A four-gigabyte transfer over a domestic connection is minutes long, and a
+ * connection that drops once in that window is ordinary rather than
+ * exceptional. Everything needed to carry on is already here — the part file
+ * on disk and a ranged request to resume it — so the only thing that made a
+ * dropped connection fatal was that nothing tried again.
+ *
+ * The wait doubles from a second, and the digest check at the end is what
+ * makes retrying safe: a resume that stitched the wrong bytes together fails
+ * there rather than becoming a model that loads and talks nonsense.
+ */
+const MAX_ATTEMPTS = 5;
+const FIRST_BACKOFF_MS = 1000;
+
 export class ModelStore {
   /** Downloads in flight, so two callers share one rather than racing. */
   private readonly inFlight = new Map<string, Promise<void>>();
   private readonly statuses = new Map<string, ModelStatus>();
   private readonly cancels = new Map<string, () => void>();
+  /**
+   * Downloads the user has called off.
+   *
+   * Separate from the callbacks above because a cancel has to survive the gap
+   * between two attempts, when there is no request in flight to destroy and
+   * nothing for a callback to do. Without it, cancelling during a backoff was
+   * quietly ignored and the download resumed a second later.
+   */
+  private readonly cancelled = new Set<string>();
 
   constructor(
     private readonly directory: string,
@@ -83,7 +126,33 @@ export class ModelStore {
   }
 
   cancel(id: string): void {
+    this.cancelled.add(id);
     this.cancels.get(id)?.();
+  }
+
+  /**
+   * Refuses a download that cannot fit before it starts.
+   *
+   * A model runs out of disk somewhere in its fourth gigabyte, twenty minutes
+   * in, and the failure that surfaces is a write error rather than a reason.
+   * Asking first costs nothing and turns that into a sentence the user can act
+   * on. A filesystem that will not answer is not treated as an objection.
+   */
+  private async assertRoomFor(bytes: number): Promise<void> {
+    let free: number;
+    try {
+      const info = await statfs(this.directory);
+      free = info.bavail * info.bsize;
+    } catch {
+      return;
+    }
+
+    // A little headroom, so this does not fill the disk to the last byte.
+    const needed = bytes + 256 * 1024 * 1024;
+    if (free >= needed) return;
+    throw new Error(
+      `there is not enough room — this needs ${gigabytes(needed)} free and ${gigabytes(free)} is available`,
+    );
   }
 
   /**
@@ -94,9 +163,13 @@ export class ModelStore {
     const existing = this.inFlight.get(id);
     if (existing !== undefined) return existing;
 
+    // A fresh request clears a cancel left over from a previous one, or the
+    // new download would abandon itself before it began.
+    this.cancelled.delete(id);
     const run = this.run(id).finally(() => {
       this.inFlight.delete(id);
       this.cancels.delete(id);
+      this.cancelled.delete(id);
     });
     this.inFlight.set(id, run);
     return run;
@@ -123,12 +196,36 @@ export class ModelStore {
       const already = await sizeOf(part);
       // A part file bigger than the finished article is not a resume point,
       // it is a wrong or corrupted file. Start again rather than reason about it.
-      const from = already > entry.bytes ? 0 : already;
+      const startFrom = already > entry.bytes ? 0 : already;
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- the directory is app userData and the filename is a catalogue constant, never user input
-      if (from === 0 && already > 0) await unlink(part).catch(() => undefined);
+      if (startFrom === 0 && already > 0) await unlink(part).catch(() => undefined);
 
-      this.set(id, { state: 'downloading', receivedBytes: from, totalBytes: entry.bytes });
-      await this.fetchInto(entry, part, from, id);
+      await this.assertRoomFor(entry.bytes - startFrom);
+
+      this.set(id, {
+        state: 'downloading',
+        receivedBytes: startFrom,
+        totalBytes: entry.bytes,
+        bytesPerSecond: 0,
+      });
+
+      // Each attempt resumes from whatever is on disk, so a connection that
+      // drops halfway costs the wait below rather than the whole download.
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          await this.fetchInto(entry, part, await sizeOf(part), id);
+          break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          // A cancel is the user's decision, not a transient failure.
+          if (message === 'cancelled' || attempt >= MAX_ATTEMPTS) throw error;
+          await delay(FIRST_BACKOFF_MS * 2 ** (attempt - 1));
+          // Cancelling during the wait has no request to interrupt, so it is
+          // noticed here instead. The failure that got us here is kept as the
+          // cause: "cancelled" is what happened, not why it stopped retrying.
+          if (this.cancelled.has(id)) throw new Error('cancelled', { cause: error });
+        }
+      }
 
       this.set(id, { state: 'verifying' });
       const digest = await sha256Of(part);
@@ -183,12 +280,35 @@ export class ModelStore {
           // eslint-disable-next-line security/detect-non-literal-fs-filename -- the directory is app userData and the filename is a catalogue constant, never user input
           const sink = createWriteStream(part, { flags: restarting || from === 0 ? 'w' : 'a' });
 
+          // Throughput, smoothed. A raw byte count between two ticks swings
+          // wildly enough that an ETA built on it is unreadable; this weights
+          // the newest reading a third and the history the rest, which settles
+          // within a couple of seconds and still reacts to a real slowdown.
+          let speed = 0;
+          let lastAt = Date.now();
+          let lastBytes = received;
+          let reportedAt = 0;
+
           response.on('data', (chunk: Buffer) => {
             received += chunk.length;
+
+            const now = Date.now();
+            if (now - reportedAt < PROGRESS_INTERVAL_MS) return;
+            reportedAt = now;
+
+            const seconds = (now - lastAt) / 1000;
+            if (seconds > 0) {
+              const sample = (received - lastBytes) / seconds;
+              speed = speed === 0 ? sample : speed * 0.7 + sample * 0.3;
+              lastAt = now;
+              lastBytes = received;
+            }
+
             this.set(id, {
               state: 'downloading',
               receivedBytes: received,
               totalBytes: entry.bytes,
+              bytesPerSecond: Math.max(0, Math.round(speed)),
             });
           });
 
@@ -227,6 +347,17 @@ export class ModelStore {
       attempt(entry.url, REDIRECT_LIMIT);
     });
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** A byte count as the sentence about disk space wants to say it. */
+function gigabytes(bytes: number): string {
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 async function sizeOf(file: string): Promise<number> {

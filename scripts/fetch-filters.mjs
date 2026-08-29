@@ -16,9 +16,35 @@ import { ElectronBlocker } from '@ghostery/adblocker-electron';
 /** `--if-missing` keeps repeat builds offline; `npm run filters:update` refreshes. */
 const ifMissing = process.argv.includes('--if-missing');
 
+/**
+ * The lists, each with somewhere else to get it.
+ *
+ * `easylist.to` is the home of both, and it is one host: when it is down or
+ * rate-limiting, a build that only knows that address simply fails, and the
+ * failure looks like Vela's rather than like someone else's web server having
+ * a bad afternoon. The alternates are the Adblock Plus download mirrors, which
+ * publish the same two lists from the same maintainers.
+ *
+ * Exact byte-equality is not needed and is not claimed. Nothing here is
+ * checksummed against a constant — the text is compiled into an engine and the
+ * engine is what ships — so a mirror a few hours out of step is a perfectly
+ * good answer, and a much better one than no engine at all.
+ */
 const LISTS = [
-  { name: 'EasyList', url: 'https://easylist.to/easylist/easylist.txt' },
-  { name: 'EasyPrivacy', url: 'https://easylist.to/easylist/easyprivacy.txt' },
+  {
+    name: 'EasyList',
+    urls: [
+      'https://easylist.to/easylist/easylist.txt',
+      'https://easylist-downloads.adblockplus.org/easylist.txt',
+    ],
+  },
+  {
+    name: 'EasyPrivacy',
+    urls: [
+      'https://easylist.to/easylist/easyprivacy.txt',
+      'https://easylist-downloads.adblockplus.org/easyprivacy.txt',
+    ],
+  },
 ];
 
 const OUT_DIR = path.resolve(process.cwd(), 'resources');
@@ -128,7 +154,7 @@ await writeFile(
   `${JSON.stringify(
     {
       builtAt: new Date().toISOString(),
-      lists: LISTS.map((list) => list.url),
+      lists: LISTS.flatMap((list) => list.urls),
       bytes: serialized.byteLength,
     },
     null,
