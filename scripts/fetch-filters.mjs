@@ -104,26 +104,64 @@ function fetchText(url, redirectsLeft = REDIRECT_LIMIT) {
   });
 }
 
-async function download({ name, url }) {
-  process.stdout.write(`  fetching ${name} … `);
+/** Everything that went wrong for one list, as one line worth reading. */
+function describeFailure(name, failures) {
+  // One line per address, not one per attempt: four identical DNS failures
+  // against the same host say nothing the first one did not.
+  const lastPerUrl = new Map();
+  for (const failure of failures) lastPerUrl.set(failure.url, failure);
 
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      const text = await fetchText(url);
-      process.stdout.write(`${String(Math.round(text.length / 1024))} KiB\n`);
-      return text;
-    } catch (error) {
-      // A build that fails because someone else's CDN blinked is not a broken
-      // build. It only gives up once the list is genuinely unreachable.
-      if (attempt === MAX_ATTEMPTS) {
-        throw new Error(`${name}: ${error instanceof Error ? error.message : String(error)}`, {
-          cause: error,
-        });
+  const reasons = [...lastPerUrl.values()]
+    .map(({ url, error }) => {
+      const message = error instanceof Error ? error.message : String(error);
+      // An AggregateError from a refused connection carries its detail in
+      // `errors` and nothing in `message`, which produced "EasyList: " and no
+      // reason at all — the exact unhelpfulness that hid a bug in this file.
+      const detail =
+        message !== ''
+          ? message
+          : Array.isArray(error?.errors) && error.errors.length > 0
+            ? error.errors.map((inner) => inner.code ?? String(inner)).join(', ')
+            : (error?.code ?? 'no reason given');
+      return `${url} (${detail})`;
+    })
+    .join('; ');
+  return `${name}: every source failed — ${reasons}`;
+}
+
+async function download({ name, urls }) {
+  process.stdout.write(`  fetching ${name} … `);
+  const failures = [];
+
+  // Each address gets the full run of attempts before the next is tried, so a
+  // host that is merely slow is not abandoned for one that may be worse.
+  for (const [index, url] of urls.entries()) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const text = await fetchText(url);
+        // A truncated response or an error page would parse into a useless
+        // engine rather than failing, so the shape is checked before it is
+        // accepted.
+        if (!text.includes('[Adblock')) throw new Error('not a filter list');
+        process.stdout.write(
+          `${String(Math.round(text.length / 1024))} KiB${index > 0 ? ' (mirror)' : ''}\n`,
+        );
+        return text;
+      } catch (error) {
+        failures.push({ url, error });
+        if (attempt < MAX_ATTEMPTS) {
+          process.stdout.write(`retrying (${String(attempt)}) … `);
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+        }
       }
-      process.stdout.write(`retrying (${String(attempt)}) … `);
-      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
     }
+    if (index < urls.length - 1) process.stdout.write('mirror … ');
   }
+
+  // A build that fails because someone else's CDN blinked is not a broken
+  // build. It only gives up once every address for the list is unreachable.
+  process.stdout.write('\n');
+  throw new Error(describeFailure(name, failures), { cause: failures[0]?.error });
 }
 
 if (ifMissing) {

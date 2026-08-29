@@ -1,8 +1,10 @@
 {
-  "builtAt": "2026-08-11T01:26:24.964Z",
+  "builtAt": "2026-08-29T17:46:15.186Z",
   "lists": [
     "https://easylist.to/easylist/easylist.txt",
-    "https://easylist.to/easylist/easyprivacy.txt"
+    "https://easylist-downloads.adblockplus.org/easylist.txt",
+    "https://easylist.to/easylist/easyprivacy.txt",
+    "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
   ],
-  "bytes": 4082833
+  "bytes": 4160721
 }
