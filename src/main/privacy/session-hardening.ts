@@ -250,6 +250,59 @@ export interface PopupNavigation {
  */
 const POPUP_SURFACE_WAIT_MS = 2000;
 
+/** How long the blank hop below will wait for its own navigation. */
+const BLANK_HOP_WAIT_MS = 1500;
+
+/**
+ * Puts one throwaway document between the popup and the page it was opened
+ * for, so the page it was opened for is not the first.
+ *
+ * The surface is registered as "run this in each new document", and the first
+ * document after registering never gets it. A navigation to another origin
+ * hides that — it is slow enough that the popup ends up a document further on
+ * than it looks — while a same-origin one commits straight into the gap. One
+ * deliberate document, and the real page is the second one, whichever origin
+ * it is on.
+ *
+ * It has to be the page that navigates, not Vela. A `loadURL` from the main
+ * process is a browser-initiated navigation to an opaque origin, and it severs
+ * the `WindowProxy` the opener is holding: `window.open` still returned a
+ * window, but touching it from the opener throws from then on, every OAuth
+ * client reads that as a blocked popup, and the sign-in this whole path exists
+ * to serve is dead. Driving `location.replace` from inside the page keeps the
+ * navigation renderer-initiated, so the blank document inherits the opener's
+ * origin and the handle survives. Both directions measured, each with a build
+ * in between.
+ *
+ * Fails soft in every direction. No attachment, no answer, or a popup that
+ * goes away mid-hop all end the same way: the caller loads the real page
+ * regardless, and the worst case is the surface this was trying to install.
+ */
+async function blankHop(contents: WebContents): Promise<void> {
+  if (contents.isDestroyed() || !contents.debugger.isAttached()) return;
+
+  const settled = new Promise<void>((resolve) => {
+    const done = (): void => {
+      clearTimeout(guard);
+      contents.off('did-stop-loading', done);
+      resolve();
+    };
+    // A hop that never reports itself must not hold the sign-in open.
+    const guard = setTimeout(done, BLANK_HOP_WAIT_MS);
+    contents.once('did-stop-loading', done);
+  });
+
+  try {
+    await contents.debugger.sendCommand('Runtime.evaluate', {
+      expression: 'location.replace("about:blank")',
+      awaitPromise: false,
+    });
+    await settled;
+  } catch {
+    // The attachment went away, or the page did. The real load still happens.
+  }
+}
+
 /**
  * Puts the surface in front of a popup's first document.
  *
@@ -293,16 +346,27 @@ export function applyBrowserSurfaceToPopup(contents: WebContents, opened: PopupN
     clearTimeout(timer);
     if (contents.isDestroyed()) return;
     const post = opened.postBody?.data;
-    void contents
-      .loadURL(opened.url, {
-        httpReferrer: opened.referrer,
-        // Omitted rather than passed as undefined: a load told it has no post
-        // data is a different request from one never told anything.
-        ...(post === undefined ? {} : { postData: post }),
-      })
-      .catch(() => {
-        // The popup shows the page's own error, exactly as a tab would.
-      });
+
+    void (async () => {
+      await blankHop(contents);
+      if (contents.isDestroyed()) return;
+
+      // The hop's blank document is Vela's errand, not the user's, so it is
+      // taken back out of the popup's history once the real page is on top of
+      // it. Otherwise Back from a sign-in lands on an empty window.
+      forgetPrimeEntry(contents);
+
+      await contents
+        .loadURL(opened.url, {
+          httpReferrer: opened.referrer,
+          // Omitted rather than passed as undefined: a load told it has no post
+          // data is a different request from one never told anything.
+          ...(post === undefined ? {} : { postData: post }),
+        })
+        .catch(() => {
+          // The popup shows the page's own error, exactly as a tab would.
+        });
+    })();
   };
 
   // Whichever comes first: the surface, or the stop above outliving its

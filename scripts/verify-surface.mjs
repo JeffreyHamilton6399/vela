@@ -26,8 +26,7 @@
  * reimplementation verifies nothing. Nothing here touches the network and
  * nothing here needs an account.
  *
- * Exits non-zero if a tab or a cross-origin popup is missing the surface. The
- * same-origin popup is reported for information only — see ADVISORY below.
+ * Exits non-zero if a tab or either popup is missing the surface.
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -223,23 +222,25 @@ child.on('close', () => {
   const WANT = 'app,csi,loadTimes';
 
   /**
-   * The same-origin popup is measured but does not decide the outcome.
+   * Both popups decide the outcome, and the same-origin one is the reason this
+   * file is worth running.
    *
-   * Its document commits in the process it was opened from, with no swap to
-   * wait through, and it can be parsed before a registration that has already
-   * been acknowledged over the protocol reaches the renderer. That is a real
-   * race and it is recorded here rather than hidden — but it is not a sign-in.
-   * A "Sign in with …" popup goes to another origin by definition, which is
-   * the row above it, and that one is deterministic.
+   * It failed for a long time and was excused as unfixable, on the reasoning
+   * that a "Sign in with ..." popup is cross-origin anyway. The cause was that
+   * the first document created after registering the surface never gets it: a
+   * cross-origin navigation is slow enough to end up a document further on
+   * than it looks, and a same-origin one commits straight into the gap. Vela
+   * now puts one deliberate blank document in front of the real page, so the
+   * real page is never the first. See `blankHop` for why the page has to be
+   * the thing that navigates.
    */
-  const ADVISORY = new Set(['popup (same-origin)']);
   let bad = false;
 
   for (const [where, raw] of Object.entries(seen)) {
     const got = raw === null ? null : JSON.parse(raw);
     const ok = got !== null && got.chrome === WANT;
-    if (!ok && !ADVISORY.has(where)) bad = true;
-    const mark = ok ? '✓' : ADVISORY.has(where) ? '·' : '✗';
+    if (!ok) bad = true;
+    const mark = ok ? '✓' : '✗';
     console.log(
       `${mark} ${where.padEnd(21)} window.chrome at document-start: ` +
         `${got === null ? '(never loaded)' : JSON.stringify(got.chrome)}`,
@@ -258,7 +259,7 @@ child.on('close', () => {
     process.exit(1);
   }
   console.log(
-    '\nA tab and a cross-origin sign-in popup both see Chrome before their own' +
-      '\nfirst script runs. Rows marked · are advisory, not failures.',
+    '\nA tab, and a sign-in popup to either origin, all see Chrome before their' +
+      '\nown first script runs.',
   );
 });
