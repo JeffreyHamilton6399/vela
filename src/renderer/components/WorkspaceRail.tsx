@@ -147,7 +147,7 @@ export function WorkspaceRail({
       aria-label="Workspaces and tools"
       // A rail with enough workspaces and docked sites to fill the window
       // scrolls rather than squashing every icon into an oval.
-      className="flex w-6 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-line bg-raised py-1"
+      className="flex w-6 shrink-0 flex-col items-center gap-1 overflow-y-auto bg-surface py-1"
     >
       {workspaces.map((workspace, index) => {
         const active = workspace.id === activeId;

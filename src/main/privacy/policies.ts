@@ -106,14 +106,43 @@ export interface BrowserIdentity {
  * built from, so every Vela install on a platform sends exactly this.
  */
 export function defaultClientHints(identity: BrowserIdentity): Record<string, string> {
-  const version = identity.chromeMajorVersion;
   return {
-    // The GREASE entry mirrors what this Chromium reports to `navigator
-    // .userAgentData`, so the header and the JS API tell the same story.
-    'Sec-CH-UA': `"Not;A=Brand";v="8", "Chromium";v="${version}", "Google Chrome";v="${version}"`,
+    'Sec-CH-UA': formatBrandList(chromeBrandList(identity)),
     'Sec-CH-UA-Mobile': '?0',
     'Sec-CH-UA-Platform': `"${clientHintPlatform(identity.platform)}"`,
   };
+}
+
+export interface Brand {
+  brand: string;
+  version: string;
+}
+
+/**
+ * The one brand list Vela claims, as data.
+ *
+ * Both halves of the claim are built from this: the `Sec-CH-UA` header above,
+ * and the `navigator.userAgentData.brands` the surface script below installs.
+ * They are the same list by construction rather than by two string literals
+ * that have to be kept in step — a browser whose header names `Google Chrome`
+ * while its JavaScript denies it is a combination nothing else on the web
+ * produces, which makes the disagreement itself the identifying bit.
+ *
+ * The GREASE entry mirrors what this Chromium reports to `navigator
+ * .userAgentData` unprompted, so nothing here contradicts the engine either.
+ */
+export function chromeBrandList(identity: BrowserIdentity): readonly Brand[] {
+  const version = identity.chromeMajorVersion;
+  return [
+    { brand: 'Not;A=Brand', version: '8' },
+    { brand: 'Chromium', version },
+    { brand: 'Google Chrome', version },
+  ];
+}
+
+/** A brand list in the structured-header form the `Sec-CH-UA` headers take. */
+function formatBrandList(entries: readonly Brand[]): string {
+  return entries.map((entry) => `"${entry.brand}";v="${entry.version}"`).join(', ');
 }
 
 /**
@@ -158,6 +187,178 @@ export function applyClientHints(
   );
 
   return { ...aligned, ...Object.fromEntries(missing) };
+}
+
+/* ------------------------------------------------------------------ */
+/* Chrome's JavaScript surface                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The languages every Vela install asks for.
+ *
+ * Fixed rather than read from the OS, for the same reason the user agent is:
+ * the set of languages a browser asks for is one of the strongest bits in a
+ * fingerprint, and a browser that asks for what everyone else asks for gives
+ * up nothing. Electron's own default is a bare `en-US`, which no Chrome has
+ * ever sent — Chromium expands this into `en-US,en;q=0.9`, which is exactly
+ * Chrome's, so the tags are passed without q-values and it adds them.
+ */
+export const ACCEPT_LANGUAGES = 'en-US,en';
+
+/** The same list as `navigator.languages` reports it. */
+export function languageTags(): readonly string[] {
+  return ACCEPT_LANGUAGES.split(',');
+}
+
+/**
+ * The parts of Chrome's JavaScript surface that Electron leaves out.
+ *
+ * Vela's user agent and client hints both say Chrome, and this is the third
+ * place a page looks. Electron defines `window.chrome` as an empty object;
+ * every real Chrome has `loadTimes`, `csi` and `app` hanging off it, and an
+ * empty one beside a Chrome user agent says "something is wearing Chrome's
+ * name" far more loudly than an honest Electron token would.
+ *
+ * This is the check Google's sign-in actually makes. Filling these three in is
+ * what takes `accounts.google.com` from "This browser or app may not be secure"
+ * to the ordinary password step — verified end to end, and verified minimal:
+ * with the brand list aligned but `window.chrome` left empty Google still
+ * refuses, and with `window.chrome` filled in and nothing else it does not.
+ *
+ * `navigator.userAgentData` and `navigator.languages` are aligned here too.
+ * Neither is what Google reads, but both are half of a claim whose other half
+ * already went out in the headers, and a browser that contradicts itself
+ * between the two is a browser that can be picked out of a crowd.
+ *
+ * Returned as source rather than run here: it is injected into the page at
+ * document-start, before anything the page loads can look.
+ */
+export function buildBrowserSurfaceScript(identity: BrowserIdentity): string {
+  const brands = JSON.stringify(chromeBrandList(identity));
+  const languages = JSON.stringify(languageTags());
+
+  // No backticks and no template holes below: this is source text, and the
+  // only interpolation it takes is the two JSON literals above.
+  return [
+    '(() => {',
+    '  const brands = ' + brands + ';',
+    '  const languages = ' + languages + ';',
+    '  const copy = () => brands.map((entry) => ({ ...entry }));',
+    '',
+    '  try {',
+    '    const chrome = window.chrome || (window.chrome = {});',
+    '    const started = () => performance.timeOrigin / 1000;',
+    '    if (chrome.loadTimes === undefined) {',
+    '      chrome.loadTimes = () => ({',
+    '        requestTime: started(),',
+    '        startLoadTime: started(),',
+    '        commitLoadTime: started(),',
+    '        finishDocumentLoadTime: started(),',
+    '        finishLoadTime: started(),',
+    '        firstPaintTime: started(),',
+    '        firstPaintAfterLoadTime: 0,',
+    '        navigationType: "Other",',
+    '        wasFetchedViaSpdy: true,',
+    '        wasNpnNegotiated: true,',
+    '        npnNegotiatedProtocol: "h2",',
+    '        wasAlternateProtocolAvailable: false,',
+    '        connectionInfo: "h2",',
+    '      });',
+    '    }',
+    '    if (chrome.csi === undefined) {',
+    '      chrome.csi = () => ({',
+    '        startE: Date.now(),',
+    '        onloadT: Date.now(),',
+    '        pageT: performance.now(),',
+    '        tran: 15,',
+    '      });',
+    '    }',
+    '    if (chrome.app === undefined) {',
+    '      chrome.app = {',
+    '        isInstalled: false,',
+    '        InstallState: { DISABLED: "disabled", INSTALLED: "installed", NOT_INSTALLED: "not_installed" },',
+    '        RunningState: { CANNOT_RUN: "cannot_run", READY_TO_RUN: "ready_to_run", RUNNING: "running" },',
+    '        getDetails: () => null,',
+    '        getIsInstalled: () => false,',
+    '        runningState: () => "cannot_run",',
+    '      };',
+    '    }',
+    '  } catch {}',
+    '',
+    '  try {',
+    '    const proto = window.NavigatorUAData && window.NavigatorUAData.prototype;',
+    '    if (proto) {',
+    '      Object.defineProperty(proto, "brands", {',
+    '        get: copy,',
+    '        configurable: true,',
+    '        enumerable: true,',
+    '      });',
+    '      const high = proto.getHighEntropyValues;',
+    '      Object.defineProperty(proto, "getHighEntropyValues", {',
+    '        value: function (hints) {',
+    '          return high.call(this, hints).then((values) => {',
+    '            if (values && "brands" in values) values.brands = copy();',
+    '            if (values && "fullVersionList" in values) values.fullVersionList = copy();',
+    '            return values;',
+    '          });',
+    '        },',
+    '        configurable: true,',
+    '        writable: true,',
+    '      });',
+    '    }',
+    '  } catch {}',
+    '',
+    '  try {',
+    '    Object.defineProperty(navigator, "languages", {',
+    '      get: () => languages.slice(),',
+    '      configurable: true,',
+    '    });',
+    '  } catch {}',
+    '})();',
+  ].join('\n');
+}
+
+/* ------------------------------------------------------------------ */
+/* Permissions                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The capabilities a page may have without being asked about.
+ *
+ * Vela's rule is that nothing gets a capability just for asking, and that
+ * stands: camera, microphone, location, notifications, MIDI, USB, serial, HID,
+ * screen capture, idle detection and reading your clipboard are all refused,
+ * silently and always, because each of them reaches past the page and at you.
+ *
+ * These four do not. They change how a page presents itself inside the window
+ * it already has — going fullscreen, capturing the pointer for a game or a map
+ * drag, holding a key chord while fullscreen, writing to the clipboard in
+ * response to a copy button. Chrome grants all four off a user gesture without
+ * a prompt, and none of them tells a site anything about you.
+ *
+ * Refusing them outright, which is what a blanket deny did, does not make the
+ * browser safer — it makes it broken. `requestFullscreen()` did not even
+ * reject: it returned a promise that never settled, so the fullscreen button
+ * on a video did nothing at all and the page's own error path never ran.
+ *
+ * `mediaKeySystem` is here for the same reason: it is what protected video
+ * asks for, Chrome answers it without a prompt, and refusing it means a
+ * streaming site simply will not play.
+ */
+const GRANTED_WITHOUT_ASKING: ReadonlySet<string> = new Set([
+  'fullscreen',
+  'pointerLock',
+  'keyboardLock',
+  'clipboard-sanitized-write',
+  'mediaKeySystem',
+]);
+
+/**
+ * Whether a page may have a capability. Default-deny: anything not named above
+ * is refused, including any permission a future Electron adds.
+ */
+export function allowsPermission(permission: string): boolean {
+  return GRANTED_WITHOUT_ASKING.has(permission);
 }
 
 /* ------------------------------------------------------------------ */

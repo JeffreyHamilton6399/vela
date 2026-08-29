@@ -15,10 +15,14 @@ export const WINDOW_DEFAULTS = {
   minHeight: 480,
 } as const;
 
-/** Near-white / near-black. Painted before the renderer loads to avoid a flash. */
+/**
+ * The chrome colour, painted before the renderer loads to avoid a flash.
+ * Must track `--color-surface` in styles.css: this is the same surface, drawn
+ * by the window a moment before the stylesheet exists to draw it.
+ */
 export const SURFACE = {
-  light: '#FAFAFA',
-  dark: '#0A0A0A',
+  light: '#F1F2F4',
+  dark: '#0C0D0F',
 } as const;
 
 /**

@@ -2,21 +2,24 @@
  * Noticing when a site has refused to sign you in because of what browser this
  * is, rather than because of anything you typed.
  *
- * Google's sign-in is the one that does this, and it cannot be talked round.
- * Vela sends a plain Chrome user agent with the client hints to match, so the
- * page loads and any check made against the headers passes; Google's is not
- * made against the headers. Vela also spent a version restoring the parts of
- * Chrome's JavaScript surface that Electron omits — the four `window.chrome`
- * members, the `Google Chrome` brand in `navigator.userAgentData` — injected at
- * document-start, verified present on the page, with `navigator.webdriver`
- * false beside them. Google refused the same address at the same step anyway.
- * Whatever it reads, it is not that, and the guess cost every tab a debugger
- * attachment and a lie about what browser it was. Both are gone.
+ * Google's sign-in is the one that does this, and Vela now passes it: the
+ * missing piece was the three members every real Chrome hangs off
+ * `window.chrome` and Electron leaves off, injected at document-start. See
+ * `buildBrowserSurfaceScript` in privacy/policies.ts for what goes in and what
+ * was measured.
  *
- * So this is what is left, and it is the honest half: recognise the refusal and
- * say what it was. "Couldn't sign you in" with no explanation reads as Vela
- * being broken, which is the one thing it is not — you have been turned away at
- * the door, and the way in is a browser Google already knows.
+ * A previous version concluded the check could not be passed at all, on the
+ * strength of a run that refused the same address with the surface restored.
+ * That run was driven through the devtools protocol with `--enable-automation`
+ * set, so `navigator.webdriver` was true throughout and Google would have
+ * refused whatever else was on the page. The surface work was reverted on the
+ * back of that result; it was the harness that was wrong.
+ *
+ * This is kept because passing a check today is not the same as passing it
+ * tomorrow. Google can change what it reads whenever it likes, and the failure
+ * it produces — "Couldn't sign you in", no reason given — reads as Vela being
+ * broken rather than as a door being held shut. If that comes back, this says
+ * which it is and offers the way round.
  */
 
 /** A sign-in refused for being the wrong browser, never for a wrong password. */

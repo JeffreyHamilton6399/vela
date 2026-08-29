@@ -11,23 +11,31 @@
     <link rel="icon" href="icon.png" />
 
     <style>
+      /*
+       * The browser's own tokens, to the value. Vela draws grey chrome with
+       * white cards floating on it, and a download page in a different palette
+       * is a download page for a different program — the first thing this page
+       * is doing is telling you what the app looks like.
+       */
       :root {
         color-scheme: light dark;
-        --surface: #fafafa;
+        --surface: #f1f2f4;
         --raised: #ffffff;
-        --line: #dbdbdb;
+        --line: #d8dade;
         --ink: #171717;
-        --ink-muted: #737373;
+        --ink-muted: #6b7076;
+        --shadow: 0 1px 4px rgb(0 0 0 / 0.08);
         --gradient: linear-gradient(135deg, #8b5cf6 0%, #e1306c 55%, #f59e0b 100%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --surface: #0a0a0a;
-          --raised: #171717;
-          --line: #262626;
+          --surface: #0c0d0f;
+          --raised: #1a1b1e;
+          --line: #2a2c31;
           --ink: #fafafa;
-          --ink-muted: #a3a3a3;
+          --ink-muted: #9aa0a8;
+          --shadow: 0 1px 4px rgb(0 0 0 / 0.5);
         }
       }
 
@@ -56,7 +64,7 @@
       }
 
       header {
-        padding: 96px 0 40px;
+        padding: 72px 0 8px;
         text-align: center;
       }
 
@@ -84,7 +92,7 @@
         flex-direction: column;
         align-items: center;
         gap: 14px;
-        margin: 40px 0 8px;
+        margin: 36px 0 28px;
       }
 
       /*
@@ -123,7 +131,10 @@
         padding: 12px 18px;
         border: 1px solid var(--line);
         border-radius: 999px;
-        background: transparent;
+        /* Was transparent, which worked when the page was near-white. On the
+           chrome grey it read as disabled; every button is a card now. */
+        background: var(--raised);
+        box-shadow: var(--shadow);
         color: var(--ink);
         font-size: 15px;
         font-weight: 600;
@@ -140,6 +151,14 @@
 
       .dl:hover {
         border-color: var(--ink);
+      }
+
+      .dl:focus-visible {
+        outline: 2px solid transparent;
+        border-color: var(--ink);
+        box-shadow:
+          var(--shadow),
+          0 0 0 3px color-mix(in srgb, var(--ink) 24%, transparent);
       }
 
       /* The build this visitor is most likely to want. Emphasis is colour
@@ -168,10 +187,19 @@
         text-align: center;
       }
 
+      /*
+       * Each section is a card, the same shape the browser gives a page.
+       * They were divided by a hairline and nothing else, which left one long
+       * undifferentiated column: every heading looked equally like the start
+       * of something, so none of them did.
+       */
       section {
-        border-top: 1px solid var(--line);
-        padding-top: 32px;
-        margin-top: 48px;
+        margin-top: 16px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--raised);
+        box-shadow: var(--shadow);
       }
 
       section p {
@@ -203,11 +231,12 @@
         font-weight: 600;
       }
 
+      /* Inset rather than outlined: a bordered box inside a bordered card is
+         two frames around one idea. This one recedes into the card instead. */
       .note {
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: var(--raised);
-        padding: 16px 20px;
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 18px 20px;
         color: var(--ink-muted);
         font-size: 14px;
       }

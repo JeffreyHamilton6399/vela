@@ -1,10 +1,17 @@
+import { Script } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
+  ACCEPT_LANGUAGES,
   alignBrandListWithChrome,
+  allowsPermission,
   applyClientHints,
+  buildBrowserSurfaceScript,
   buildUserAgent,
+  chromeBrandList,
   categorizeRequest,
   decideHttpsUpgrade,
+  defaultClientHints,
+  languageTags,
   trimCrossOriginReferer,
   UPDATE_FEED_URL,
 } from '../../src/main/privacy/policies.js';
@@ -250,5 +257,102 @@ describe('categorizeRequest', () => {
     expect(
       categorizeRequest({ url: 'https://analytics.example/collect', fromWebContents: false }),
     ).toBe('unexpected');
+  });
+});
+
+describe('the browser surface script', () => {
+  const IDENTITY = { platform: 'win32', chromeMajorVersion: '150' };
+
+  it('is valid JavaScript', () => {
+    expect(() => new Script(buildBrowserSurfaceScript(IDENTITY))).not.toThrow();
+  });
+
+  /**
+   * The one that matters. An empty `window.chrome` beside a Chrome user agent
+   * is what Google's sign-in reads, and filling these three in is what takes
+   * accounts.google.com from a refusal to the ordinary password step.
+   */
+  it('defines the three members Chrome hangs off window.chrome', () => {
+    const source = buildBrowserSurfaceScript(IDENTITY);
+    for (const member of ['loadTimes', 'csi', 'app']) {
+      expect(source).toContain(`chrome.${member} =`);
+    }
+  });
+
+  /**
+   * The header and the script are two halves of one claim. If they can drift
+   * apart, the disagreement between them becomes the identifying bit — which
+   * is the thing the brand alignment exists to avoid.
+   */
+  it('claims exactly the brands the client-hint header claims', () => {
+    const header = defaultClientHints(IDENTITY)['Sec-CH-UA'];
+    const source = buildBrowserSurfaceScript(IDENTITY);
+
+    for (const entry of chromeBrandList(IDENTITY)) {
+      expect(header).toContain(`"${entry.brand}";v="${entry.version}"`);
+      expect(source).toContain(JSON.stringify(entry.brand));
+    }
+  });
+
+  it('asks for the languages the session asks for', () => {
+    expect(ACCEPT_LANGUAGES).toBe('en-US,en');
+    expect(buildBrowserSurfaceScript(IDENTITY)).toContain(JSON.stringify(languageTags()));
+  });
+
+  it('carries no install, session, or machine identifier', () => {
+    const source = buildBrowserSurfaceScript(IDENTITY);
+    expect(source).toBe(buildBrowserSurfaceScript(IDENTITY));
+    expect(source.toLowerCase()).not.toContain('vela');
+    expect(source.toLowerCase()).not.toContain('electron');
+  });
+});
+
+describe('permissions', () => {
+  /**
+   * These four change how a page uses the window it already has, and Chrome
+   * grants every one of them off a user gesture without a prompt. A blanket
+   * deny did not make Vela safer, it made fullscreen video impossible:
+   * `requestFullscreen()` returned a promise that never settled at all.
+   */
+  it('allows what only changes how a page uses its own window', () => {
+    for (const permission of [
+      'fullscreen',
+      'pointerLock',
+      'keyboardLock',
+      'clipboard-sanitized-write',
+      'mediaKeySystem',
+    ]) {
+      expect(allowsPermission(permission)).toBe(true);
+    }
+  });
+
+  it('refuses everything that reaches past the page', () => {
+    for (const permission of [
+      'geolocation',
+      'media',
+      'notifications',
+      'midi',
+      'midiSysex',
+      'usb',
+      'serial',
+      'hid',
+      'display-capture',
+      'idle-detection',
+      'clipboard-read',
+      'deprecated-sync-clipboard-read',
+      'storage-access',
+      'top-level-storage-access',
+      'window-management',
+      'speaker-selection',
+      'openExternal',
+      'fileSystem',
+      'unknown',
+    ]) {
+      expect(allowsPermission(permission)).toBe(false);
+    }
+  });
+
+  it('refuses a permission it has never heard of', () => {
+    expect(allowsPermission('some-capability-a-later-electron-adds')).toBe(false);
   });
 });

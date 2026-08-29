@@ -25,7 +25,7 @@ export function Toolbar({
   const id = tab?.id ?? null;
 
   return (
-    <div className="drag flex h-6 shrink-0 items-center gap-1 border-b border-line bg-raised px-1">
+    <div className="drag flex h-6 shrink-0 items-center gap-1 bg-surface px-1 pb-[2px]">
       <IconButton
         label="Back"
         hint="alt+←"
