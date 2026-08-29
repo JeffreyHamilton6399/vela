@@ -18,13 +18,35 @@ function gigabytes(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
+/**
+ * How much longer, in the roundest terms that are still true.
+ *
+ * Null until there is a rate worth dividing by: a download reports itself
+ * within a tenth of a second of starting, and an estimate built on that first
+ * reading says four hours and then eleven seconds, which is worse than saying
+ * nothing. The units stop at minutes — anything longer is "over an hour", not
+ * a false promise about the seventh minute.
+ */
+function remaining(bytesLeft: number, bytesPerSecond: number): string | null {
+  if (bytesPerSecond <= 0 || bytesLeft <= 0) return null;
+
+  const seconds = Math.round(bytesLeft / bytesPerSecond);
+  if (seconds < 10) return 'nearly there';
+  if (seconds < 60) return `about ${String(seconds)}s left`;
+  if (seconds < 3600) return `about ${String(Math.round(seconds / 60))} min left`;
+  return 'over an hour left';
+}
+
 function describe(status: ModelStatus): string {
   switch (status.state) {
     case 'ready':
       return 'On this machine';
     case 'downloading': {
       const percent = Math.floor((status.receivedBytes / Math.max(1, status.totalBytes)) * 100);
-      return `Downloading — ${String(percent)}%`;
+      const rest = remaining(status.totalBytes - status.receivedBytes, status.bytesPerSecond);
+      return rest === null
+        ? `Downloading — ${String(percent)}%`
+        : `Downloading — ${String(percent)}%, ${rest}`;
     }
     case 'verifying':
       return 'Checking the download';

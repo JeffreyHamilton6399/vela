@@ -407,6 +407,8 @@ if (!app.requestSingleInstanceLock()) {
         list: (sender) => windowFor(sender)?.downloads.list ?? [],
         open: (sender, id) => windowFor(sender)?.downloads.open(id),
         showInFolder: (sender, id) => windowFor(sender)?.downloads.showInFolder(id),
+        pause: (sender, id) => windowFor(sender)?.downloads.pause(id),
+        resume: (sender, id) => windowFor(sender)?.downloads.resume(id),
         cancel: (sender, id) => windowFor(sender)?.downloads.cancel(id),
         clear: (sender) => windowFor(sender)?.downloads.clear(),
         togglePopup: (sender) => windowFor(sender)?.downloadPopup.toggle(),

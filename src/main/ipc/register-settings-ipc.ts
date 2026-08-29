@@ -61,6 +61,8 @@ export interface SettingsIpcDeps extends GuardOptions {
     list: (sender: unknown) => DownloadItem[];
     open: (sender: unknown, id: string) => void;
     showInFolder: (sender: unknown, id: string) => void;
+    pause: (sender: unknown, id: string) => void;
+    resume: (sender: unknown, id: string) => void;
     cancel: (sender: unknown, id: string) => void;
     clear: (sender: unknown) => void;
     togglePopup: (sender: unknown) => void;
@@ -221,6 +223,14 @@ export function registerSettingsIpc(deps: SettingsIpcDeps): void {
 
   handleSend(deps, SEND_CHANNELS.downloadsCancel, ({ id }, sender) => {
     deps.downloads.cancel(sender, id);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsPause, ({ id }, sender) => {
+    deps.downloads.pause(sender, id);
+  });
+
+  handleSend(deps, SEND_CHANNELS.downloadsResume, ({ id }, sender) => {
+    deps.downloads.resume(sender, id);
   });
 
   handleSend(deps, SEND_CHANNELS.downloadsClear, (_payload, sender) => {

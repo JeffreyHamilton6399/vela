@@ -57,6 +57,8 @@ export const modelStatusSchema = z.discriminatedUnion('state', [
     state: z.literal('downloading'),
     receivedBytes: z.number().nonnegative(),
     totalBytes: z.number().nonnegative(),
+    /** Smoothed recent throughput, for a rate and a time remaining. */
+    bytesPerSecond: z.number().nonnegative(),
   }),
   z.object({ state: z.literal('verifying') }),
   z.object({ state: z.literal('ready') }),
@@ -175,6 +177,14 @@ export const downloadItemSchema = z.object({
   totalBytes: z.number().int().nonnegative(),
   savePath: z.string().max(4096),
   startedAt: z.number().int().nonnegative(),
+  /** Current throughput, so the panel can show a rate and a time remaining. */
+  bytesPerSecond: z.number().int().nonnegative(),
+  /**
+   * Whether a paused or interrupted download can be picked up again. A server
+   * that does not do ranged requests cannot, and offering the button anyway
+   * produces a button that silently does nothing.
+   */
+  canResume: z.boolean(),
 });
 export type DownloadItem = z.infer<typeof downloadItemSchema>;
 
@@ -323,6 +333,8 @@ export const SEND_CHANNELS = {
   downloadsOpen: 'downloads:open',
   downloadsShow: 'downloads:show',
   downloadsCancel: 'downloads:cancel',
+  downloadsPause: 'downloads:pause',
+  downloadsResume: 'downloads:resume',
   downloadsClear: 'downloads:clear',
   downloadsPopupToggle: 'downloads:popup-toggle',
   downloadsPopupClose: 'downloads:popup-close',
@@ -481,6 +493,8 @@ export const sendContract = {
   [SEND_CHANNELS.downloadsOpen]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.downloadsShow]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.downloadsCancel]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.downloadsPause]: z.object({ id: tabIdString }),
+  [SEND_CHANNELS.downloadsResume]: z.object({ id: tabIdString }),
   [SEND_CHANNELS.downloadsClear]: emptySchema,
   [SEND_CHANNELS.downloadsPopupToggle]: emptySchema,
   [SEND_CHANNELS.downloadsPopupClose]: emptySchema,
@@ -614,6 +628,9 @@ export interface VelaBridge {
     open(id: string): void;
     showInFolder(id: string): void;
     cancel(id: string): void;
+    /** Holds a download where it is; the bytes already on disk are kept. */
+    pause(id: string): void;
+    resume(id: string): void;
     clear(): void;
     onChanged(listener: (items: DownloadItem[]) => void): () => void;
     /** Shows or hides the bubble that floats over the page's top-right corner. */
