@@ -85,14 +85,35 @@ brand, and `en-US,en`. What is _not_ claimed here is that this is sufficient for
 that can only be established by signing in, and it is the one thing the checks in this repository
 cannot do for you.
 
-The popup path is worth its own paragraph, because it was quietly racy. A tab can wait — nothing
-is asked of it until Vela calls `loadUrl`, so the load is chained behind the surface being in
-place. A popup cannot: Electron creates the window, starts the navigation `window.open` asked for,
-and only then hands it over, so a script registered at that point is registered for the _next_
-document. Whether it won came down to how long the navigation took, which meant a cross-process
-popup usually passed and a same-origin one usually did not. Vela now holds the popup's navigation
-and re-issues it behind the surface, carrying the referrer and any post body across, so it no
-longer depends on the timing. `window.opener` survives, which every OAuth SDK needs.
+The popup path is worth its own paragraph, because it was broken twice over and the second one
+was not what it looked like. A tab can wait — nothing is asked of it until Vela calls `loadUrl`,
+so the load is chained behind the surface being in place. A popup cannot: Electron creates the
+window, starts the navigation `window.open` asked for, and only then hands it over, so a script
+registered at that point is registered for the _next_ document. Vela holds that navigation and
+re-issues it behind the surface, carrying the referrer and any post body across; `window.opener`
+survives, which every OAuth SDK needs.
+
+That fixed the cross-origin popup and left the same-origin one empty, which read as a timing
+difference — a cross-process navigation is slow enough to wait through, a same-process one is not.
+The real rule is simpler and worse: the first document created after registering the surface never
+gets it. A cross-origin navigation only appeared to work because it is slow enough that the popup
+ends up a document further on than it looks; a same-origin one commits straight into the gap. So
+Vela puts one deliberate blank document in front, and the page the popup was opened for is never
+the first one.
+
+Which document does the hop matters as much as that it happens. Loading `about:blank` from the
+main process is a browser-initiated navigation to an opaque origin, and it severs the `WindowProxy`
+the opener is holding — `window.open` still returns a window, but touching it from the opener
+throws from then on, every OAuth client reads that as a blocked popup, and the sign-in the whole
+path exists for is dead. Driving `location.replace` from inside the page keeps the navigation
+renderer-initiated, so the blank document inherits the opener's origin and the handle survives. The
+entry it leaves is taken back out of the popup's history, so Back still goes where it should.
+
+Four approaches were measured before that one, each with a build in between: waiting longer,
+flushing the protocol queue with a round trip, and the two browser-initiated hops that broke the
+opener. `npm run verify:surface` covers a tab and a popup to either origin, and fails if any of
+them is missing the surface — the same-origin row used to be excused as advisory, and is not any
+more.
 
 A previous version concluded all of this was unfixable, having restored the same surface and been
 refused anyway. That experiment ran through an automation harness that set `navigator.webdriver`
