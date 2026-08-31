@@ -26,8 +26,12 @@
       /*
        * The browser's own tokens, to the value. Vela draws grey chrome with
        * white cards floating on it, and a download page in a different palette
-       * is a download page for a different program — the first thing this page
-       * does is show you what the app looks like.
+       * is a download page for a different program.
+       *
+       * The gradient is deliberately scarce. In the browser it appears in two
+       * places — the active tab and the focus ring — and on this page it is the
+       * mark and the active tab of the window below, and nothing else. A
+       * heading that fades from purple to amber is a different product.
        */
       :root {
         color-scheme: light dark;
@@ -40,26 +44,12 @@
         --ink-muted: #6b7076;
         --ink-faint: #9298a0;
 
-        /* The three stops the icon, the active tab and the focus rings share. */
-        --stop-a: #8b5cf6;
-        --stop-b: #e1306c;
-        --stop-c: #f59e0b;
-        --gradient: linear-gradient(
-          135deg,
-          var(--stop-a) 0%,
-          var(--stop-b) 55%,
-          var(--stop-c) 100%
-        );
+        --gradient: linear-gradient(135deg, #8b5cf6 0%, #e1306c 55%, #f59e0b 100%);
 
-        /* Three elevations rather than one, so a card, a floating button and
-           the window mock are not all sitting at the same height. */
-        --shadow-1: 0 1px 2px rgb(16 18 22 / 0.06), 0 1px 3px rgb(16 18 22 / 0.06);
-        --shadow-2: 0 1px 2px rgb(16 18 22 / 0.06), 0 8px 24px -10px rgb(16 18 22 / 0.24);
-        --shadow-3: 0 2px 6px rgb(16 18 22 / 0.06), 0 32px 70px -24px rgb(16 18 22 / 0.34);
+        --shadow-soft: 0 1px 2px rgb(16 18 22 / 0.06);
+        --shadow-lift: 0 1px 2px rgb(16 18 22 / 0.06), 0 18px 44px -20px rgb(16 18 22 / 0.3);
 
-        --radius-card: 16px;
-        --radius-page: 10px;
-        --container: 1120px;
+        --page-radius: 10px;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -72,9 +62,8 @@
           --ink-muted: #9aa0a8;
           --ink-faint: #767c85;
 
-          --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
-          --shadow-2: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -10px rgb(0 0 0 / 0.6);
-          --shadow-3: 0 2px 6px rgb(0 0 0 / 0.4), 0 32px 70px -24px rgb(0 0 0 / 0.8);
+          --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4);
+          --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 18px 44px -20px rgb(0 0 0 / 0.75);
         }
       }
 
@@ -82,10 +71,6 @@
       *::before,
       *::after {
         box-sizing: border-box;
-      }
-
-      html {
-        scroll-behavior: smooth;
       }
 
       body {
@@ -100,105 +85,46 @@
           'Helvetica Neue',
           Arial,
           sans-serif;
-        font-size: 16px;
-        line-height: 1.6;
+        font-size: 17px;
+        line-height: 1.65;
         -webkit-font-smoothing: antialiased;
-      }
-
-      /*
-       * Two very quiet washes of the gradient behind the top of the page. The
-       * palette is otherwise grey, so this is the only colour above the fold
-       * that is not a download button.
-       */
-      body::before {
-        content: '';
-        position: fixed;
-        inset: -20vh 0 auto 0;
-        height: 90vh;
-        z-index: -1;
-        pointer-events: none;
-        opacity: 0.55;
-        background:
-          radial-gradient(
-            60% 55% at 22% 12%,
-            color-mix(in srgb, var(--stop-a) 18%, transparent),
-            transparent 70%
-          ),
-          radial-gradient(
-            55% 50% at 82% 4%,
-            color-mix(in srgb, var(--stop-b) 14%, transparent),
-            transparent 70%
-          );
-      }
-
-      @media (prefers-color-scheme: dark) {
-        body::before {
-          opacity: 0.4;
-        }
       }
 
       a {
         color: inherit;
       }
 
+      :focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+
+      /* One column, and the prose sits in a narrower one than the window. */
       .wrap {
         width: 100%;
-        max-width: var(--container);
+        max-width: 1000px;
         margin: 0 auto;
-        padding: 0 clamp(20px, 5vw, 40px);
+        padding: 0 clamp(20px, 5vw, 32px);
       }
 
-      /* Anything focused by keyboard gets a ring in the browser's own accent. */
-      :focus-visible {
-        outline: 2px solid color-mix(in srgb, var(--stop-a) 70%, var(--ink));
-        outline-offset: 2px;
-        border-radius: 6px;
-      }
-
-      .skip {
-        position: absolute;
-        left: 50%;
-        top: -60px;
-        z-index: 60;
-        transform: translateX(-50%);
-        padding: 10px 18px;
-        border-radius: 999px;
-        background: var(--raised);
-        box-shadow: var(--shadow-2);
-        font-size: 14px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: top 0.15s ease;
-      }
-
-      .skip:focus-visible {
-        top: 12px;
+      .measure {
+        max-width: 660px;
       }
 
       /* ------------------------------------------------------------------ */
       /* Header                                                             */
       /* ------------------------------------------------------------------ */
 
-      .site-header {
-        position: sticky;
-        top: 0;
-        z-index: 40;
-        backdrop-filter: saturate(1.4) blur(14px);
-        -webkit-backdrop-filter: saturate(1.4) blur(14px);
-        background: color-mix(in srgb, var(--surface) 78%, transparent);
-        border-bottom: 1px solid transparent;
-        transition: border-color 0.2s ease;
+      header.top {
+        border-bottom: 1px solid var(--line);
       }
 
-      .site-header[data-stuck='true'] {
-        border-bottom-color: var(--line);
-      }
-
-      .site-header .wrap {
+      header.top .wrap {
         display: flex;
         align-items: center;
-        gap: 16px;
-        height: 62px;
+        gap: 24px;
+        height: 64px;
       }
 
       .wordmark {
@@ -206,59 +132,31 @@
         align-items: center;
         gap: 10px;
         margin-right: auto;
-        font-size: 17px;
-        font-weight: 650;
-        letter-spacing: -0.015em;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
         text-decoration: none;
       }
 
-      .nav-links {
+      header.top nav {
         display: flex;
-        align-items: center;
-        gap: 4px;
+        gap: 24px;
+        font-size: 15px;
       }
 
-      .nav-links a {
-        padding: 7px 12px;
-        border-radius: 999px;
+      header.top nav a {
         color: var(--ink-muted);
-        font-size: 14px;
-        font-weight: 550;
         text-decoration: none;
-        transition:
-          color 0.15s ease,
-          background-color 0.15s ease;
       }
 
-      .nav-links a:hover {
-        background: color-mix(in srgb, var(--ink) 7%, transparent);
+      header.top nav a:hover {
         color: var(--ink);
       }
 
-      @media (max-width: 760px) {
-        .nav-links {
+      @media (max-width: 640px) {
+        header.top nav {
           display: none;
         }
-      }
-
-      .nav-cta {
-        flex-shrink: 0;
-        padding: 9px 18px;
-        border-radius: 999px;
-        background: var(--ink);
-        color: var(--surface);
-        font-size: 14px;
-        font-weight: 600;
-        text-decoration: none;
-        box-shadow: var(--shadow-1);
-        transition:
-          transform 0.15s ease,
-          opacity 0.15s ease;
-      }
-
-      .nav-cta:hover {
-        transform: translateY(-1px);
-        opacity: 0.9;
       }
 
       /* ------------------------------------------------------------------ */
@@ -266,59 +164,31 @@
       /* ------------------------------------------------------------------ */
 
       .hero {
-        padding: clamp(48px, 9vw, 96px) 0 0;
-        text-align: center;
+        padding: clamp(56px, 10vw, 104px) 0 0;
       }
 
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin: 0 0 24px;
-        padding: 6px 14px 6px 6px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        background: color-mix(in srgb, var(--raised) 70%, transparent);
-        box-shadow: var(--shadow-1);
-        color: var(--ink-muted);
-        font-size: 13px;
-        font-weight: 550;
-        text-decoration: none;
-      }
-
-      .eyebrow .pill {
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: var(--gradient);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+      .version {
+        display: block;
+        margin: 0 0 20px;
+        color: var(--ink-faint);
+        font-size: 14px;
       }
 
       h1 {
+        max-width: 17ch;
+        text-wrap: balance;
         margin: 0;
-        font-size: clamp(38px, 7.4vw, 72px);
-        font-weight: 680;
-        line-height: 1.02;
-        letter-spacing: -0.04em;
-      }
-
-      h1 .grad {
-        background: var(--gradient);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        font-size: clamp(40px, 6.6vw, 62px);
+        font-weight: 600;
+        line-height: 1.04;
+        letter-spacing: -0.035em;
       }
 
       .lede {
-        max-width: 640px;
-        margin: 22px auto 0;
+        max-width: 56ch;
+        margin: 24px 0 0;
         color: var(--ink-muted);
-        font-size: clamp(17px, 2.1vw, 20px);
-        line-height: 1.55;
-        text-wrap: balance;
+        font-size: clamp(17px, 2vw, 19px);
       }
 
       /* ------------------------------------------------------------------ */
@@ -326,128 +196,74 @@
       /* ------------------------------------------------------------------ */
 
       .downloads {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 14px;
         margin: 36px 0 0;
       }
 
-      /*
-       * The build this visitor is most likely to want, and the only element on
-       * the page at this weight. Everything else stays one click away below it,
-       * because detecting a platform is a guess and is sometimes wrong.
-       */
       .dl-primary {
         display: inline-flex;
         align-items: center;
         gap: 12px;
-        padding: 14px 26px;
+        padding: 13px 24px;
         border: 1px solid var(--ink);
         border-radius: 999px;
         background: var(--ink);
-        box-shadow: var(--shadow-2);
+        box-shadow: var(--shadow-soft);
         color: var(--surface);
         font-size: 16px;
-        font-weight: 620;
+        font-weight: 600;
         line-height: 1.2;
         text-decoration: none;
-        transition:
-          transform 0.15s ease,
-          box-shadow 0.15s ease,
-          opacity 0.15s ease;
       }
 
       .dl-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-3);
-        opacity: 0.94;
+        opacity: 0.88;
       }
 
       .dl-primary .meta {
         padding-left: 12px;
-        border-left: 1px solid color-mix(in srgb, var(--surface) 35%, transparent);
+        border-left: 1px solid color-mix(in srgb, var(--surface) 30%, transparent);
         font-size: 13px;
-        font-weight: 500;
-        opacity: 0.75;
+        font-weight: 400;
+        opacity: 0.7;
       }
 
-      /* Every other build, at one size. Which machine you happen to own is not
-         a reason for a target to be harder to hit. */
+      /*
+       * The other builds, as text. Detection is a guess and has to be
+       * correctable, but five identical buttons made the guess worthless.
+       */
       .dl-alts {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 8px;
-        max-width: 780px;
+        margin: 18px 0 0;
+        color: var(--ink-faint);
+        font-size: 14px;
       }
 
-      .dl-alt {
-        display: inline-flex;
-        align-items: center;
-        padding: 8px 16px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        background: var(--raised);
-        box-shadow: var(--shadow-1);
+      .dl-alts a {
+        border-bottom: 1px solid var(--line);
         color: var(--ink-muted);
-        font-size: 13.5px;
-        font-weight: 550;
-        white-space: nowrap;
         text-decoration: none;
-        transition:
-          color 0.15s ease,
-          border-color 0.15s ease,
-          transform 0.15s ease;
       }
 
-      .dl-alt:hover {
-        transform: translateY(-1px);
-        border-color: var(--ink-faint);
+      .dl-alts a:hover {
+        border-bottom-color: var(--ink);
         color: var(--ink);
       }
 
-      .dl-note {
-        margin: 2px 0 0;
-        color: var(--ink-faint);
-        font-size: 13.5px;
-      }
-
-      .dl-note strong {
-        color: var(--ink-muted);
-        font-weight: 600;
+      .dl-alts .sep {
+        padding: 0 8px;
+        color: var(--line);
       }
 
       /* ------------------------------------------------------------------ */
-      /* The window mock                                                    */
+      /* The window                                                         */
       /* ------------------------------------------------------------------ */
-
-      .mock-frame {
-        position: relative;
-        max-width: 980px;
-        margin: clamp(48px, 7vw, 80px) auto 0;
-      }
-
-      /* A soft bed of the gradient under the window, so it reads as sitting on
-         the page rather than pasted onto it. */
-      .mock-frame::before {
-        content: '';
-        position: absolute;
-        inset: 12% 6% -6% 6%;
-        z-index: -1;
-        border-radius: 50%;
-        background: var(--gradient);
-        filter: blur(60px);
-        opacity: 0.35;
-      }
 
       .mock {
         overflow: hidden;
+        margin: clamp(48px, 8vw, 88px) 0 0;
         border: 1px solid var(--line);
         border-radius: 14px;
         background: var(--surface);
-        box-shadow: var(--shadow-3);
-        text-align: left;
+        box-shadow: var(--shadow-lift);
         user-select: none;
       }
 
@@ -468,7 +284,7 @@
         max-width: 190px;
         height: 32px;
         padding: 0 10px;
-        border-radius: var(--radius-page);
+        border-radius: var(--page-radius);
         color: var(--ink-muted);
         font-size: 12px;
       }
@@ -481,11 +297,11 @@
 
       .mock-tab.is-active {
         background: var(--raised);
-        box-shadow: var(--shadow-1);
+        box-shadow: var(--shadow-soft);
         color: var(--ink);
       }
 
-      /* One of the two places the gradient appears in the browser itself. */
+      /* The gradient, in the place the browser puts it. */
       .mock-tab.is-active::after {
         content: '';
         position: absolute;
@@ -578,10 +394,10 @@
         margin-left: auto;
         padding: 2px 8px;
         border-radius: 999px;
-        background: color-mix(in srgb, var(--stop-a) 14%, transparent);
-        color: color-mix(in srgb, var(--stop-a) 72%, var(--ink));
+        background: var(--surface);
+        color: var(--ink-muted);
         font-size: 11px;
-        font-weight: 650;
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
       }
@@ -607,13 +423,13 @@
         place-items: center;
         width: 32px;
         height: 32px;
-        border-radius: var(--radius-page);
+        border-radius: var(--page-radius);
         color: var(--ink-muted);
       }
 
       .rail-btn.is-active {
         background: var(--raised);
-        box-shadow: var(--shadow-1);
+        box-shadow: var(--shadow-soft);
         color: var(--ink);
       }
 
@@ -647,7 +463,7 @@
         margin: 0 6px 6px 0;
         padding: 28px clamp(16px, 4vw, 40px) 32px;
         border: 1px solid var(--line-soft);
-        border-radius: var(--radius-page);
+        border-radius: var(--page-radius);
         background: var(--surface);
       }
 
@@ -655,6 +471,7 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        overflow: hidden;
         max-width: 520px;
         height: 44px;
         margin: 0 auto 24px;
@@ -662,10 +479,8 @@
         border: 1px solid var(--line);
         border-radius: 999px;
         background: var(--raised);
-        box-shadow: var(--shadow-1);
         color: var(--ink-faint);
         font-size: 14px;
-        overflow: hidden;
       }
 
       .dial-search span {
@@ -677,7 +492,7 @@
 
       .dial-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(96px, 100%), 1fr));
         gap: 12px;
         max-width: 620px;
         margin: 0 auto;
@@ -737,251 +552,137 @@
       /* ------------------------------------------------------------------ */
 
       section {
-        scroll-margin-top: 84px;
-        padding: clamp(64px, 10vw, 112px) 0 0;
-      }
-
-      .section-head {
-        max-width: 660px;
-        margin: 0 0 40px;
-      }
-
-      .section-head.is-centred {
-        margin-right: auto;
-        margin-left: auto;
-        text-align: center;
-      }
-
-      .kicker {
-        display: block;
-        margin: 0 0 12px;
-        color: var(--ink-faint);
-        font-size: 12.5px;
-        font-weight: 700;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
+        padding: clamp(64px, 9vw, 104px) 0 0;
+        scroll-margin-top: 24px;
       }
 
       h2 {
-        margin: 0;
-        font-size: clamp(28px, 4.2vw, 42px);
-        font-weight: 660;
-        line-height: 1.1;
-        letter-spacing: -0.03em;
+        max-width: 26ch;
         text-wrap: balance;
+        margin: 0 0 20px;
+        font-size: clamp(26px, 3.4vw, 34px);
+        font-weight: 600;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
       }
 
-      .section-head p {
-        margin: 16px 0 0;
+      p {
+        margin: 0 0 18px;
         color: var(--ink-muted);
-        font-size: 17px;
-        text-wrap: pretty;
       }
 
-      h3 {
-        margin: 0 0 8px;
-        font-size: 17px;
-        font-weight: 620;
+      p:last-child {
+        margin-bottom: 0;
+      }
+
+      strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      /*
+       * Most of the page is this: a term, a sentence about it, and a rule
+       * between them. It was a grid of cards with an icon in every one, which
+       * made each point look exactly as important as the others and the page
+       * look like something generated.
+       */
+      .rows {
+        margin: 32px 0 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .rows > div {
+        display: grid;
+        grid-template-columns: 200px minmax(0, 1fr);
+        gap: 6px 32px;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .rows dt {
+        font-weight: 600;
         letter-spacing: -0.01em;
       }
 
-      /* ------------------------------------------------------------------ */
-      /* The three numbers                                                  */
-      /* ------------------------------------------------------------------ */
-
-      .figures {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
-        gap: 16px;
-      }
-
-      .figure {
-        padding: 28px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-card);
-        background: var(--raised);
-        box-shadow: var(--shadow-1);
-      }
-
-      .figure b {
-        display: inline-block;
-        background: var(--gradient);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        font-size: 52px;
-        font-weight: 680;
-        line-height: 1;
-        letter-spacing: -0.05em;
-      }
-
-      .figure p {
-        margin: 14px 0 0;
-        color: var(--ink-muted);
-        font-size: 15px;
-        text-wrap: pretty;
-      }
-
-      .figure p strong {
-        color: var(--ink);
-        font-weight: 600;
-      }
-
-      /* ------------------------------------------------------------------ */
-      /* Card grids                                                         */
-      /* ------------------------------------------------------------------ */
-
-      .cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr));
-        gap: 16px;
-      }
-
-      /* Four cards under a row of three numbers. In the same three columns the
-         fourth is stranded on a line of its own, so this set pairs up. */
-      .cards.is-pairs {
-        grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
-      }
-
-      .card {
-        padding: 26px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-card);
-        background: var(--raised);
-        box-shadow: var(--shadow-1);
-        transition:
-          transform 0.2s ease,
-          box-shadow 0.2s ease,
-          border-color 0.2s ease;
-      }
-
-      .card:hover {
-        transform: translateY(-2px);
-        border-color: var(--ink-faint);
-        box-shadow: var(--shadow-2);
-      }
-
-      .card p {
+      .rows dd {
         margin: 0;
         color: var(--ink-muted);
-        font-size: 15px;
-        text-wrap: pretty;
+        font-size: 16px;
       }
 
-      .card p + p {
-        margin-top: 12px;
+      @media (max-width: 700px) {
+        .rows > div {
+          grid-template-columns: minmax(0, 1fr);
+        }
       }
 
-      .card p strong {
-        color: var(--ink);
+      /* The catalogue: three facts per line, and it reads as one thing. */
+      .models {
+        margin: 36px 0 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .models div {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .models b {
+        min-width: 160px;
+        font-size: 16px;
         font-weight: 600;
       }
 
-      .card-icon {
-        display: grid;
-        place-items: center;
-        width: 38px;
-        height: 38px;
-        margin-bottom: 18px;
-        border: 1px solid var(--line);
-        border-radius: 11px;
-        background: var(--surface);
-        color: var(--ink);
+      .models span {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--ink-muted);
+        font-size: 15px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .models i {
+        color: var(--ink-faint);
+        font-size: 14px;
+        font-style: normal;
+        font-variant-numeric: tabular-nums;
+      }
+
+      @media (max-width: 560px) {
+        .models span {
+          display: none;
+        }
       }
 
       /* ------------------------------------------------------------------ */
-      /* Assistant                                                          */
+      /* The assistant, and its sidebar                                     */
       /* ------------------------------------------------------------------ */
 
       .split {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: clamp(24px, 4vw, 56px);
-        align-items: center;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: clamp(28px, 5vw, 56px);
+        align-items: start;
       }
 
-      @media (max-width: 900px) {
+      @media (max-width: 860px) {
         .split {
           grid-template-columns: minmax(0, 1fr);
         }
       }
 
-      .prose h2 {
-        margin-bottom: 20px;
-      }
-
-      .prose p {
-        margin: 0 0 16px;
-        color: var(--ink-muted);
-        font-size: 16.5px;
-        text-wrap: pretty;
-      }
-
-      .prose p strong {
-        color: var(--ink);
-        font-weight: 600;
-      }
-
-      .models {
-        margin: 24px 0 0;
-        padding: 0;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-card);
-        background: var(--raised);
-        box-shadow: var(--shadow-1);
-        list-style: none;
-      }
-
-      .models li {
-        display: flex;
-        align-items: baseline;
-        gap: 12px;
-        padding: 12px 18px;
-        font-size: 14.5px;
-      }
-
-      .models li + li {
-        border-top: 1px solid var(--line-soft);
-      }
-
-      .models b {
-        font-weight: 600;
-        white-space: nowrap;
-      }
-
-      .models em {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        color: var(--ink-muted);
-        font-size: 13.5px;
-        font-style: normal;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .models .size {
-        color: var(--ink-faint);
-        font-size: 13px;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-
-      @media (max-width: 560px) {
-        .models em {
-          display: none;
-        }
-      }
-
-      /* The sidebar, drawn the way the app draws it. */
       .panel-mock {
         display: flex;
         overflow: hidden;
         border: 1px solid var(--line);
         border-radius: 14px;
         background: var(--surface);
-        box-shadow: var(--shadow-3);
+        box-shadow: var(--shadow-lift);
         user-select: none;
       }
 
@@ -990,10 +691,10 @@
         flex: 1;
         flex-direction: column;
         min-width: 0;
-        min-height: 340px;
+        min-height: 320px;
         margin: 6px 6px 6px 0;
         border: 1px solid var(--line-soft);
-        border-radius: var(--radius-page);
+        border-radius: var(--page-radius);
         background: var(--raised);
       }
 
@@ -1027,7 +728,7 @@
       .bubble {
         max-width: 88%;
         margin: 0;
-        padding: 10px 14px;
+        padding: 9px 13px;
         border-radius: 14px;
         font-size: 13.5px;
         line-height: 1.5;
@@ -1048,170 +749,55 @@
       }
 
       .panel-input {
-        display: flex;
-        align-items: center;
-        height: 36px;
         margin: auto 12px 12px;
-        padding: 0 14px;
+        padding: 7px 14px;
         border: 1px solid var(--line);
         border-radius: 999px;
         color: var(--ink-faint);
         font-size: 13px;
       }
 
-      .panel-foot {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 14px;
-        border-top: 1px solid var(--line-soft);
-        color: var(--ink-faint);
-        font-size: 12px;
-      }
-
       /* ------------------------------------------------------------------ */
-      /* Shortcuts                                                          */
+      /* Small print                                                        */
       /* ------------------------------------------------------------------ */
 
-      .shortcuts {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 16px;
-      }
-
-      .shortcut {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 7px 14px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
+      kbd,
+      code {
+        border: 1px solid var(--line-soft);
+        border-radius: 5px;
         background: var(--raised);
-        box-shadow: var(--shadow-1);
-        color: var(--ink-muted);
-        font-size: 13.5px;
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.85em;
       }
 
       kbd {
-        display: inline-block;
-        padding: 2px 6px;
-        border: 1px solid var(--line);
-        border-bottom-width: 2px;
-        border-radius: 6px;
-        background: var(--surface);
-        color: var(--ink);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 11.5px;
+        padding: 1px 5px;
         font-weight: 600;
-        line-height: 1.5;
       }
 
       code {
-        padding: 1px 6px;
-        border: 1px solid var(--line-soft);
-        border-radius: 6px;
-        background: var(--surface);
-        color: var(--ink);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 0.88em;
+        padding: 1px 5px;
       }
 
-      /* ------------------------------------------------------------------ */
-      /* Installing                                                         */
-      /* ------------------------------------------------------------------ */
-
-      .install {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
-        gap: 16px;
-      }
-
-      .install .card p {
-        font-size: 14.5px;
-      }
-
-      .install .card p + p {
-        margin-top: 10px;
-      }
-
-      .os-mark {
-        display: inline-flex;
+      .closing {
+        display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 14px;
-        font-size: 15px;
-        font-weight: 620;
+        gap: 20px 32px;
+        margin-top: clamp(64px, 9vw, 104px);
+        padding-top: clamp(40px, 6vw, 56px);
+        border-top: 1px solid var(--line);
       }
 
-      /*
-       * An inset accent edge rather than a border-image, which would take the
-       * card's corners with it.
-       */
-      .callout {
-        position: relative;
-        overflow: hidden;
-        margin-top: 16px;
-        padding: 18px 22px 18px 26px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-card);
-        background: var(--raised);
-        box-shadow: var(--shadow-1);
-        color: var(--ink-muted);
-        font-size: 15px;
+      .closing p {
+        max-width: 42ch;
+        margin: 0;
       }
-
-      .callout::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 3px;
-        background: var(--gradient);
-      }
-
-      .callout strong {
-        color: var(--ink);
-      }
-
-      /* ------------------------------------------------------------------ */
-      /* Closing call to action                                             */
-      /* ------------------------------------------------------------------ */
-
-      .closer {
-        margin-top: clamp(64px, 10vw, 112px);
-        padding: clamp(40px, 6vw, 64px) clamp(24px, 5vw, 56px);
-        border: 1px solid var(--line);
-        border-radius: 24px;
-        background: var(--raised);
-        box-shadow: var(--shadow-2);
-        text-align: center;
-      }
-
-      .closer h2 {
-        max-width: 620px;
-        margin: 0 auto;
-      }
-
-      .closer > p {
-        max-width: 560px;
-        margin: 16px auto 0;
-        color: var(--ink-muted);
-        font-size: 17px;
-      }
-
-      .closer .downloads {
-        margin-top: 32px;
-      }
-
-      /* ------------------------------------------------------------------ */
-      /* Footer                                                             */
-      /* ------------------------------------------------------------------ */
 
       footer {
-        margin-top: clamp(48px, 8vw, 88px);
-        padding: 32px 0 56px;
+        margin-top: clamp(48px, 7vw, 72px);
+        padding: 24px 0 56px;
         border-top: 1px solid var(--line);
         color: var(--ink-faint);
         font-size: 14px;
@@ -1220,13 +806,11 @@
       footer .wrap {
         display: flex;
         flex-wrap: wrap;
-        align-items: center;
         gap: 8px 20px;
       }
 
       footer nav {
         display: flex;
-        flex-wrap: wrap;
         gap: 20px;
         margin-left: auto;
       }
@@ -1238,50 +822,11 @@
 
       footer a:hover {
         color: var(--ink);
-        text-decoration: underline;
-      }
-
-      /* ------------------------------------------------------------------ */
-      /* Reveal on scroll — only ever with script, and never against a       */
-      /* stated motion preference. Without either, everything is visible.    */
-      /* ------------------------------------------------------------------ */
-
-      .js .reveal {
-        opacity: 0;
-        transform: translateY(14px);
-        transition:
-          opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-          transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-      }
-
-      .js .reveal.is-in {
-        transform: none;
-        opacity: 1;
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        html {
-          scroll-behavior: auto;
-        }
-
-        .js .reveal {
-          transform: none;
-          opacity: 1;
-        }
-
-        *,
-        *::before,
-        *::after {
-          animation-duration: 0.001ms !important;
-          transition-duration: 0.001ms !important;
-        }
       }
     </style>
   </head>
 
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-
     <!--
       The mark, as the icon generator draws it: a rounded square carrying the
       gradient, with a sail and a hull knocked out of it in near-white. Inline
@@ -1302,54 +847,48 @@
       </defs>
     </svg>
 
-    <header class="site-header" id="site-header">
+    <header class="top">
       <div class="wrap">
         <a class="wordmark" href="#top">
-          <svg width="26" height="26" aria-hidden="true"><use href="#vela-mark" /></svg>
+          <svg width="24" height="24" aria-hidden="true"><use href="#vela-mark" /></svg>
           Vela
         </a>
-        <nav class="nav-links" aria-label="Sections">
-          <a href="#privacy">Privacy</a>
+        <nav aria-label="Sections">
           <a href="#assistant">Assistant</a>
           <a href="#features">Features</a>
           <a href="#install">Install</a>
-          <a href="https://github.com/JeffreyHamilton6399/vela">GitHub</a>
+          <a href="https://github.com/JeffreyHamilton6399/vela">Source</a>
         </nav>
-        <a class="nav-cta" href="#download">Download</a>
       </div>
     </header>
 
-    <main id="main">
-      <div class="hero wrap" id="top">
-        <a class="eyebrow" href="https://github.com/JeffreyHamilton6399/vela/releases/latest">
-          <span class="pill">v0.1.1</span>
-          Windows, macOS and Linux — free and open source
-        </a>
-
-        <h1>
-          A browser that collects<br />
-          nothing. Not less. <span class="grad">Nothing.</span>
-        </h1>
-
+    <main id="top">
+      <div class="hero wrap">
+        <span class="version">Version 0.1.1 — Windows, macOS and Linux</span>
+        <h1>A browser that collects nothing.</h1>
         <p class="lede">
-          Vela is a desktop browser with no company behind it and no server to phone. Out of the box
-          it makes two kinds of network request: the pages you open, and one check for a new
-          version.
+          Not less — nothing. There is no server behind Vela and no account to make, and out of the
+          box it sends two kinds of request: the pages you open, and one check for a new version.
+          That is the whole list.
         </p>
 
-        <div class="downloads" id="download">
+        <div class="downloads">
           <!--
             Replaced by the script below with the build for this machine. Left
             as a working link, so the page still downloads something when the
             script does not run.
           -->
-          <a class="dl-primary" href="https://github.com/JeffreyHamilton6399/vela/releases/latest">
+          <a
+            class="dl-primary"
+            id="download"
+            href="https://github.com/JeffreyHamilton6399/vela/releases/latest"
+          >
             Download Vela
           </a>
-          <div class="dl-alts" id="dl-alts"></div>
-          <p class="dl-note" id="dl-note">
-            Windows, macOS and Linux · <strong>v0.1.1</strong> · nothing bundled, nothing to opt out
-            of
+          <p class="dl-alts" id="dl-alts">
+            <a href="https://github.com/JeffreyHamilton6399/vela/releases/latest">
+              All builds and release notes
+            </a>
           </p>
         </div>
 
@@ -1359,122 +898,152 @@
           follows the system's, and costs no image request from a page whose
           whole claim is that it makes none.
         -->
-        <div class="mock-frame reveal">
-          <div
-            class="mock"
-            role="img"
-            aria-label="The Vela window: a tab strip, an address bar showing fourteen blocked trackers, the left rail of workspaces and tools, and the Speed Dial page."
-          >
-            <div class="mock-titlebar">
-              <div class="mock-tab is-active">
-                <span class="fav" style="background: linear-gradient(135deg, #8b5cf6, #e1306c)">
-                  V
-                </span>
-                <span>Speed Dial</span>
-              </div>
-              <div class="mock-tab is-extra">
-                <span class="fav" style="background: #de5833">D</span>
-                <span>DuckDuckGo — Privacy, simplified</span>
-              </div>
-              <div class="mock-tab is-extra">
-                <span class="fav" style="background: #24292f">G</span>
-                <span>JeffreyHamilton6399/vela</span>
-              </div>
-              <span class="mock-newtab" aria-hidden="true">
+        <div
+          class="mock"
+          role="img"
+          aria-label="The Vela window: a tab strip, an address bar showing fourteen blocked trackers, the left rail of workspaces and tools, and the Speed Dial page."
+        >
+          <div class="mock-titlebar">
+            <div class="mock-tab is-active">
+              <span class="fav" style="background: linear-gradient(135deg, #8b5cf6, #e1306c)">
+                V
+              </span>
+              <span>Speed Dial</span>
+            </div>
+            <div class="mock-tab is-extra">
+              <span class="fav" style="background: #de5833">D</span>
+              <span>DuckDuckGo — Privacy, simplified</span>
+            </div>
+            <div class="mock-tab is-extra">
+              <span class="fav" style="background: #24292f">G</span>
+              <span>JeffreyHamilton6399/vela</span>
+            </div>
+            <span class="mock-newtab" aria-hidden="true">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            <div class="mock-winctl" aria-hidden="true"><i>—</i><i>▢</i><i>✕</i></div>
+          </div>
+
+          <div class="mock-toolbar">
+            <span class="mock-btn" aria-hidden="true">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </span>
+            <span class="mock-btn" aria-hidden="true">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </span>
+            <span class="mock-btn" aria-hidden="true">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 12a9 9 0 11-3-6.7L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </span>
+
+            <div class="mock-omnibox">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 018 0v4" />
+              </svg>
+              <span class="host">
+                duckduckgo.com<span class="muted">/?q=how+to+leave+chrome</span>
+              </span>
+              <span class="blocked">
                 <svg
-                  width="13"
-                  height="13"
+                  width="11"
+                  height="11"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2.2"
-                  stroke-linecap="round"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </span>
-              <div class="mock-winctl" aria-hidden="true"><i>—</i><i>▢</i><i>✕</i></div>
-            </div>
-
-            <div class="mock-toolbar">
-              <span class="mock-btn" aria-hidden="true">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
                   stroke-linejoin="round"
-                >
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </span>
-              <span class="mock-btn" aria-hidden="true">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </span>
-              <span class="mock-btn" aria-hidden="true">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M21 12a9 9 0 11-3-6.7L21 8" />
-                  <path d="M21 3v5h-5" />
-                </svg>
-              </span>
-
-              <div class="mock-omnibox">
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
                   aria-hidden="true"
                 >
-                  <rect x="4" y="11" width="16" height="10" rx="2" />
-                  <path d="M8 11V7a4 4 0 018 0v4" />
+                  <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
                 </svg>
-                <span class="host">
-                  duckduckgo.com<span class="muted">/?q=how+to+leave+chrome</span>
-                </span>
-                <span class="blocked">
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.2"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
-                  </svg>
-                  14 blocked
-                </span>
-              </div>
+                14 blocked
+              </span>
+            </div>
 
-              <span class="mock-btn is-extra" aria-hidden="true">
+            <span class="mock-btn is-extra" aria-hidden="true">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+              >
+                <path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z" />
+              </svg>
+            </span>
+            <span class="mock-btn is-extra" aria-hidden="true">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
+              </svg>
+            </span>
+          </div>
+
+          <div class="mock-body">
+            <div class="mock-rail">
+              <span class="rail-btn is-active" aria-hidden="true">
                 <svg
                   width="15"
                   height="15"
@@ -1484,12 +1053,84 @@
                   stroke-width="2"
                   stroke-linejoin="round"
                 >
+                  <path d="M12 3l9 5-9 5-9-5z" />
+                  <path d="M3 13l9 5 9-5" />
+                </svg>
+              </span>
+              <span class="rail-btn" aria-hidden="true">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                >
+                  <path d="M4 6h6l2 2h8v11H4z" />
+                </svg>
+              </span>
+              <span class="rail-sep"></span>
+              <span class="rail-btn" aria-hidden="true">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+                </svg>
+              </span>
+              <span class="rail-btn" aria-hidden="true">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 4h11l3 3v13H5z" />
+                  <path d="M8 9h8M8 13h8M8 17h5" />
+                </svg>
+              </span>
+              <span class="rail-btn" aria-hidden="true">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18" />
+                </svg>
+              </span>
+              <span class="rail-spacer"></span>
+              <span class="rail-btn" aria-hidden="true">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="3.2" />
                   <path
-                    d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z"
+                    d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"
                   />
                 </svg>
               </span>
-              <span class="mock-btn is-extra" aria-hidden="true">
+            </div>
+
+            <div class="mock-page">
+              <div class="dial-search">
                 <svg
                   width="15"
                   height="15"
@@ -1498,16 +1139,132 @@
                   stroke="currentColor"
                   stroke-width="2"
                   stroke-linecap="round"
-                  stroke-linejoin="round"
+                  aria-hidden="true"
                 >
-                  <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3.6-3.6" />
                 </svg>
-              </span>
+                <span>Search DuckDuckGo, or type an address</span>
+              </div>
+
+              <div class="dial-grid">
+                <div class="dial-tile">
+                  <span class="fav" style="background: #de5833">D</span><span>DuckDuckGo</span>
+                </div>
+                <div class="dial-tile">
+                  <span class="fav" style="background: #24292f">G</span><span>GitHub</span>
+                </div>
+                <div class="dial-tile">
+                  <span class="fav" style="background: #3a3a3a">W</span><span>Wikipedia</span>
+                </div>
+                <div class="dial-tile">
+                  <span class="fav" style="background: #ff6600">H</span><span>Hacker News</span>
+                </div>
+                <div class="dial-tile">
+                  <span class="fav" style="background: #cc0000">Y</span><span>YouTube</span>
+                </div>
+                <div class="dial-tile">
+                  <span class="fav" style="background: #0f9d58">M</span><span>Maps</span>
+                </div>
+                <div class="dial-tile">
+                  <span class="fav" style="background: #1a73e8">C</span><span>Calendar</span>
+                </div>
+                <div class="dial-tile is-add">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  <span>Add</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section id="privacy">
+        <div class="wrap">
+          <div class="measure">
+            <h2>What "nothing" means here</h2>
+            <p>
+              The pages you navigate to, and one plain GET on the GitHub releases feed — no query
+              parameters, no install identifier, and a user agent that is the version string and
+              nothing else. In development an assertion on Vela's own network layer logs anything
+              that is neither, so an accidental call home turns up while it is being written rather
+              than after it ships.
+            </p>
+            <p>
+              Everything Vela remembers is one JSON file on your disk. The settings panel prints its
+              path, and the export button hands you its contents verbatim.
+            </p>
+          </div>
+
+          <dl class="rows">
+            <div>
+              <dt>Ads and trackers</dt>
+              <dd>
+                Blocked by default, from EasyList and EasyPrivacy compiled into the app when it is
+                built. Vela never fetches a filter list while running, because that would be a third
+                kind of request; the lists refresh by shipping a new version.
+              </dd>
+            </div>
+            <div>
+              <dt>Private windows</dt>
+              <dd>
+                A session held only in memory. A test in the repository browses inside one and
+                proves nothing reached the disk.
+              </dd>
+            </div>
+            <div>
+              <dt>One user agent</dt>
+              <dd>
+                The same string for every install. One unique to your copy is a fingerprint, not a
+                defence.
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section id="assistant">
+        <div class="wrap">
+          <div class="split">
+            <div>
+              <h2>The assistant runs inside Vela</h2>
+              <p>
+                It defaults to <strong>a model running in the app itself</strong>. Nothing else to
+                install, no second program, and no port to talk to: llama.cpp is linked into the
+                process, so a question never becomes a network request in the first place. That is a
+                stronger claim than "it only goes to localhost" — there is no request.
+              </p>
+              <p>
+                Vela ships without a model on purpose, since four gigabytes in the installer is a
+                miserable download for anyone who never opens the panel. Settings offers a catalogue
+                instead, and the one you pick downloads once — resumable, and checked against its
+                SHA-256 before it is used.
+              </p>
+              <p>
+                Ollama still works if you already run it, and a hosted service works with a key you
+                paste in. Only that last one adds a network destination, which is why it is not the
+                default.
+              </p>
             </div>
 
-            <div class="mock-body">
+            <div
+              class="panel-mock"
+              role="img"
+              aria-label="Vela's sidebar showing the assistant: a question, an answer, and the name of the model running locally."
+            >
               <div class="mock-rail">
-                <span class="rail-btn is-active" aria-hidden="true">
+                <span class="rail-btn" aria-hidden="true">
                   <svg
                     width="15"
                     height="15"
@@ -1521,21 +1278,8 @@
                     <path d="M3 13l9 5 9-5" />
                   </svg>
                 </span>
-                <span class="rail-btn" aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M4 6h6l2 2h8v11H4z" />
-                  </svg>
-                </span>
                 <span class="rail-sep"></span>
-                <span class="rail-btn" aria-hidden="true">
+                <span class="rail-btn is-active" aria-hidden="true">
                   <svg
                     width="15"
                     height="15"
@@ -1562,752 +1306,167 @@
                     <path d="M8 9h8M8 13h8M8 17h5" />
                   </svg>
                 </span>
-                <span class="rail-btn" aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18" />
-                  </svg>
-                </span>
-                <span class="rail-spacer"></span>
-                <span class="rail-btn" aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="12" cy="12" r="3.2" />
-                    <path
-                      d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"
-                    />
-                  </svg>
-                </span>
               </div>
 
-              <div class="mock-page">
-                <div class="dial-search">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="M20 20l-3.6-3.6" />
-                  </svg>
-                  <span>Search DuckDuckGo, or type an address</span>
+              <div class="panel-body">
+                <div class="panel-head">
+                  Assistant
+                  <span class="tag">Qwen 3 4B · local</span>
                 </div>
 
-                <div class="dial-grid">
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #de5833">D</span><span>DuckDuckGo</span>
-                  </div>
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #24292f">G</span><span>GitHub</span>
-                  </div>
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #3a3a3a">W</span><span>Wikipedia</span>
-                  </div>
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #ff6600">H</span><span>Hacker News</span>
-                  </div>
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #cc0000">Y</span><span>YouTube</span>
-                  </div>
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #0f9d58">M</span><span>Maps</span>
-                  </div>
-                  <div class="dial-tile">
-                    <span class="fav" style="background: #1a73e8">C</span><span>Calendar</span>
-                  </div>
-                  <div class="dial-tile is-add">
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    <span>Add</span>
-                  </div>
+                <div class="chat">
+                  <p class="bubble is-you">Summarise this page in three lines.</p>
+                  <p class="bubble is-it">
+                    It argues that browser privacy is mostly a question of how many places your
+                    traffic can go, and then counts them…
+                  </p>
+                  <p class="bubble is-you">Is any of this leaving my machine?</p>
+                  <p class="bubble is-it">No. I am running inside this window.</p>
                 </div>
+
+                <div class="panel-input">Ask about this page…</div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- ---------------------------------------------------------------- -->
-
-      <section id="privacy">
-        <div class="wrap">
-          <div class="section-head is-centred reveal">
-            <span class="kicker">The claim, in numbers</span>
-            <h2>
-              Most browsers tell you what they collect. This one can tell you what it doesn't.
-            </h2>
-          </div>
-
-          <div class="figures reveal">
-            <div class="figure">
-              <b>2</b>
-              <p>
-                <strong>kinds of request out of the box.</strong> The pages you navigate to, and one
-                plain GET on the GitHub releases feed — no query parameters, no install identifier,
-                and a user agent that is the version string and nothing else.
-              </p>
+          <div class="models">
+            <div><b>Llama 3.2 1B</b><span>Fine on an old laptop</span><i>0.8 GB</i></div>
+            <div>
+              <b>Gemma 3 4B</b><span>Writes the most naturally of its size</span><i>2.5 GB</i>
             </div>
-            <div class="figure">
-              <b>0</b>
-              <p>
-                <strong>servers, accounts and analytics.</strong> There is nothing to sign into and
-                nowhere for anything to go. A third destination appears only if you switch the
-                assistant to a hosted service yourself.
-              </p>
+            <div>
+              <b>Qwen 3 4B</b><span>The default — quick, and rarely wrong</span><i>2.5 GB</i>
             </div>
-            <div class="figure">
-              <b>1</b>
-              <p>
-                <strong>file holding everything Vela remembers.</strong> Local JSON. The settings
-                panel prints its path, and the export button hands you its contents verbatim.
-              </p>
+            <div>
+              <b>Qwen 2.5 Coder 7B</b><span>Tuned for code and shell commands</span><i>4.7 GB</i>
             </div>
-          </div>
-
-          <div class="cards is-pairs reveal" style="margin-top: 16px">
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linejoin="round"
-                >
-                  <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
-                  <path d="M9 12l2 2 4-4" stroke-linecap="round" />
-                </svg>
-              </div>
-              <h3>Ads and trackers blocked by default</h3>
-              <p>
-                EasyList and EasyPrivacy are compiled into the app when it is built. Vela never
-                fetches a filter list while running, because that would be a third kind of request —
-                the lists refresh by shipping a new version.
-              </p>
-            </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
-                  <path d="M4 4l16 16" />
-                </svg>
-              </div>
-              <h3>Private windows that really are</h3>
-              <p>
-                <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> opens a session held only in memory. A
-                test in the repository browses inside one and proves nothing reached the disk.
-              </p>
-            </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <circle cx="12" cy="12" r="9" />
-                  <path
-                    d="M3.4 9h17.2M3.4 15h17.2M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"
-                  />
-                </svg>
-              </div>
-              <h3>One user agent for everyone</h3>
-              <p>
-                No per-install randomisation. A string unique to your copy is a fingerprint, not a
-                defence — every Vela says exactly the same thing.
-              </p>
-            </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M4 7h16M4 12h16M4 17h10" />
-                </svg>
-              </div>
-              <h3>Telemetry caught while it is written</h3>
-              <p>
-                In development an assertion on the session's own network layer logs any request that
-                is not one of the two above, so an accidental call home shows up during the build
-                rather than after it ships.
-              </p>
-            </div>
+            <div><b>Qwen 3 8B</b><span>A step up, if the memory is there</span><i>5.0 GB</i></div>
           </div>
         </div>
       </section>
-
-      <!-- ---------------------------------------------------------------- -->
-
-      <section id="assistant">
-        <div class="wrap">
-          <div class="split">
-            <div class="prose reveal">
-              <span class="kicker">The assistant</span>
-              <h2>It runs inside Vela, so there is no request to make</h2>
-              <p>
-                The sidebar assistant defaults to <strong>a model running in Vela itself</strong>.
-                Nothing else to install, no second program, and no port to talk to: llama.cpp is
-                linked into the process, so a question never becomes a network request in the first
-                place. That is a stronger claim than “it only goes to localhost” — there is no
-                request.
-              </p>
-              <p>
-                Vela ships without a model on purpose. Four gigabytes inside the installer would be
-                a miserable download for everyone who never opens the panel, so Settings offers a
-                short catalogue instead, and the one you pick downloads once — resumable, and
-                checked against its SHA-256 before it is ever used.
-              </p>
-              <p>
-                <strong>Ollama</strong> is still there for anyone already running it, and a hosted
-                service works with a key you paste in. Only that last one adds a network
-                destination, which is exactly why it is not the default.
-              </p>
-
-              <ul class="models">
-                <li>
-                  <b>Llama 3.2 1B</b><em>Fine on an old laptop</em><span class="size">0.8 GB</span>
-                </li>
-                <li>
-                  <b>Gemma 3 4B</b><em>Writes the most naturally of its size</em
-                  ><span class="size">2.5 GB</span>
-                </li>
-                <li>
-                  <b>Qwen 3 4B</b><em>The default — quick, and rarely wrong</em
-                  ><span class="size">2.5 GB</span>
-                </li>
-                <li>
-                  <b>Qwen 2.5 Coder 7B</b><em>Tuned for code and shell commands</em
-                  ><span class="size">4.7 GB</span>
-                </li>
-                <li>
-                  <b>Qwen 3 8B</b><em>A step up, if the memory is there</em
-                  ><span class="size">5.0 GB</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="reveal">
-              <div
-                class="panel-mock"
-                role="img"
-                aria-label="Vela's sidebar showing the assistant: a question, an answer, and a note saying the model runs in this process."
-              >
-                <div class="mock-rail">
-                  <span class="rail-btn" aria-hidden="true">
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M12 3l9 5-9 5-9-5z" />
-                      <path d="M3 13l9 5 9-5" />
-                    </svg>
-                  </span>
-                  <span class="rail-sep"></span>
-                  <span class="rail-btn is-active" aria-hidden="true">
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
-                    </svg>
-                  </span>
-                  <span class="rail-btn" aria-hidden="true">
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M5 4h11l3 3v13H5z" />
-                      <path d="M8 9h8M8 13h8M8 17h5" />
-                    </svg>
-                  </span>
-                </div>
-
-                <div class="panel-body">
-                  <div class="panel-head">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
-                    </svg>
-                    Assistant
-                    <span class="tag">Qwen 3 4B · local</span>
-                  </div>
-
-                  <div class="chat">
-                    <p class="bubble is-you">Summarise this page in three lines.</p>
-                    <p class="bubble is-it">
-                      It argues that browser privacy is mostly a question of how many places your
-                      traffic can go, and then counts them…
-                    </p>
-                    <p class="bubble is-you">Is any of this leaving my machine?</p>
-                    <p class="bubble is-it">No. I am running inside this window.</p>
-                  </div>
-
-                  <div class="panel-input"><span>Ask about this page…</span></div>
-
-                  <div class="panel-foot">
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
-                    </svg>
-                    In-process. No socket is opened for this.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ---------------------------------------------------------------- -->
 
       <section id="features">
         <div class="wrap">
-          <div class="section-head reveal">
-            <span class="kicker">The Opera parts</span>
-            <h2>A browser you would want to use anyway</h2>
+          <div class="measure">
+            <h2>The rest of it is an ordinary browser</h2>
             <p>
-              Privacy that costs you the features you already rely on is a trade most people quite
-              reasonably refuse. Vela does not ask for it.
+              Privacy that costs you the features you rely on is a trade most people reasonably
+              refuse, so Vela takes its layout from Opera and its posture from DuckDuckGo.
             </p>
           </div>
 
-          <div class="cards reveal">
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linejoin="round"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="3" />
-                  <path d="M9 4v16" />
-                </svg>
-              </div>
-              <h3>Workspaces on a left rail</h3>
-              <p>
-                Named tab groups, the way Opera does them. Leaving a workspace suspends its tabs —
-                an idle one costs storage for its titles and nothing else, because the renderer is
-                genuinely handed back.
-              </p>
+          <dl class="rows">
+            <div>
+              <dt>Workspaces</dt>
+              <dd>
+                Named tab groups on a left rail. Leaving one suspends its tabs, so an idle workspace
+                costs storage for its titles and nothing else — the renderer is genuinely handed
+                back.
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linejoin="round"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="3" />
-                  <path d="M15 4v16" />
-                </svg>
-              </div>
-              <h3>Web panels beside the page</h3>
-              <p>
-                Dock any site into the sidebar. Each panel is an ordinary view on the same hardened
-                session a tab uses — same sandbox, same blocking, no preload — and closing it
-                destroys the view rather than leaving a renderer running.
-              </p>
+            <div>
+              <dt>Web panels</dt>
+              <dd>
+                Any site docked into the sidebar beside the page, on the same hardened session a tab
+                uses. Closing a panel destroys the view rather than leaving it running.
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linejoin="round"
-                >
-                  <rect x="3" y="3" width="7" height="7" rx="2" />
-                  <rect x="14" y="3" width="7" height="7" rx="2" />
-                  <rect x="3" y="14" width="7" height="7" rx="2" />
-                  <rect x="14" y="14" width="7" height="7" rx="2" />
-                </svg>
-              </div>
-              <h3>Speed Dial, bookmarks, history</h3>
-              <p>
-                A new tab page with favicons cached on your own disk, a bookmarks bar, and local
-                history that feeds the command palette. Per-site zoom that sticks, on
-                <kbd>Ctrl</kbd> <kbd>+</kbd> and <kbd>Ctrl</kbd> <kbd>0</kbd>.
-              </p>
+            <div>
+              <dt>Speed Dial and the palette</dt>
+              <dd>
+                A new tab page with favicons cached on your own disk, a bookmarks bar, local history
+                feeding a command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, and per-site zoom that
+                sticks.
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M13 3L5 14h6l-1 7 8-11h-6z" />
-                </svg>
-              </div>
-              <h3>Bang shortcuts, resolved here</h3>
-              <p>
+            <div>
+              <dt>Bang shortcuts</dt>
+              <dd>
                 <code>!gh</code>, <code>!yt</code> and <code>!w</code> expand on your machine, so
                 the address reaches the site without a search engine seeing the query on the way
                 past.
-              </p>
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
-                </svg>
-              </div>
-              <h3>Downloads that survive a bad line</h3>
-              <p>
-                A bubble rises over the page as a file lands, with a rate and a time remaining.
-                Large transfers retry with a widening wait and resume from the part file rather than
-                starting over.
-              </p>
+            <div>
+              <dt>Downloads</dt>
+              <dd>
+                A bubble over the page with a rate and a time remaining. Large transfers retry with
+                a widening wait and resume from the part file rather than starting over.
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="3" y="5" width="18" height="14" rx="3" />
-                  <path d="M8 10l3 2-3 2M13 14h4" />
-                </svg>
-              </div>
-              <h3>A menu that knows what you clicked</h3>
-              <p>
-                Save a link, image, video or audio file, copy an address, open it in a new tab, or
-                search a selection with the engine you chose on the first run. Native, so it floats
-                above the page instead of being painted underneath it.
-              </p>
+            <div>
+              <dt>No VPN, and no sync</dt>
+              <dd>
+                A browser-branded "free VPN" is someone else's server watching your traffic;
+                Settings takes a proxy you already trust instead. The sign-in is local too — it
+                unlocks an encrypted file on this machine, and there is no server to sync it with.
+              </dd>
             </div>
-          </div>
-
-          <div class="shortcuts reveal">
-            <span class="shortcut"><kbd>Ctrl</kbd> <kbd>K</kbd> Command palette</span>
-            <span class="shortcut"><kbd>Ctrl</kbd> <kbd>B</kbd> Sidebar</span>
-            <span class="shortcut"
-              ><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>N</kbd> Private window</span
-            >
-            <span class="shortcut"
-              ><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>T</kbd> Reopen last tab</span
-            >
-            <span class="shortcut"><kbd>Ctrl</kbd> <kbd>0</kbd> Reset this site's zoom</span>
-          </div>
+          </dl>
         </div>
       </section>
-
-      <!-- ---------------------------------------------------------------- -->
-
-      <section id="refusals">
-        <div class="wrap">
-          <div class="section-head reveal">
-            <span class="kicker">Two refusals</span>
-            <h2>Things a privacy browser is expected to ship, and this one will not</h2>
-          </div>
-
-          <div class="cards reveal">
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M5.6 5.6l12.8 12.8" />
-                </svg>
-              </div>
-              <h3>No built-in VPN</h3>
-              <p>
-                A browser-branded “free VPN” is somebody else's server watching all your traffic —
-                the exact arrangement this browser exists to avoid, and it needs infrastructure Vela
-                does not run.
-              </p>
-              <p>
-                Settings takes a proxy or VPN <strong>you</strong> already trust instead, and routes
-                every session through it.
-              </p>
-            </div>
-
-            <div class="card">
-              <div class="card-icon" aria-hidden="true">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.9"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="4" y="11" width="16" height="10" rx="2.5" />
-                  <path d="M8 11V7.5a4 4 0 018 0V11" />
-                </svg>
-              </div>
-              <h3>No hosted account, and no sync</h3>
-              <p>
-                Vela has a sign-in, but it unlocks an encrypted file on your own computer. The
-                master password is never stored — only a separate scrypt derivation of it — and
-                saved credentials are AES-256-GCM under a key derived the same way. There is no
-                password reset, because there is nobody to ask.
-              </p>
-              <p>
-                Sign in to a site once and Vela offers to remember it, then fills it as the page
-                loads. The password it captures never reaches the part of Vela that draws the
-                prompt.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ---------------------------------------------------------------- -->
 
       <section id="install">
         <div class="wrap">
-          <div class="section-head reveal">
-            <span class="kicker">Installing</span>
-            <h2>The first launch will warn you. Here is why, and what to click.</h2>
+          <div class="measure">
+            <h2>The first launch will warn you</h2>
             <p>
-              Vela's builds are not code-signed yet, so your operating system will say it does not
-              recognise them. Nothing is wrong with the download; the certificate that would quiet
-              the warning is a running cost a free program does not have.
+              The builds are not code-signed yet, so your operating system will say it does not
+              recognise them. Each one is made on a machine of its own kind — a
+              <code>.dmg</code> can only be produced on macOS and an <code>.AppImage</code> on Linux
+              — which is why 0.1.0 shipped Windows-only and 0.1.1 is the first release carrying all
+              three.
             </p>
           </div>
 
-          <div class="install reveal">
-            <div class="card">
-              <div class="os-mark">
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 5.5l8-1.1v7.2H3zM12 4.2L21 3v8.6h-9zM3 12.4h8v7.2l-8-1.1zM12 12.4h9V21l-9-1.2z"
-                  />
-                </svg>
-                Windows
-              </div>
-              <p>
-                SmartScreen says <strong>“Windows protected your PC”</strong>. Click
-                <em>More info</em>, then <em>Run anyway</em>.
-              </p>
-              <p>An <code>.exe</code> installer, for x64 and ARM64.</p>
+          <dl class="rows">
+            <div>
+              <dt>Windows</dt>
+              <dd>
+                SmartScreen says "Windows protected your PC". Click <em>More info</em>, then
+                <em>Run anyway</em>. An <code>.exe</code> for x64 and ARM64.
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="os-mark">
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M16.2 12.6c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.4-.1-2.7.8-3.4.8s-1.8-.8-2.9-.8c-1.5 0-2.9.9-3.7 2.2-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.8-.7s1.7.7 2.9.7 2-1.1 2.7-2.2c.9-1.3 1.2-2.5 1.2-2.6 0 0-2.2-.9-2.2-3.6zM14 5.9c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.4-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.2z"
-                  />
-                </svg>
-                macOS
-              </div>
-              <p>
-                Gatekeeper says Vela <strong>“cannot be opened”</strong>. Right-click the app,
-                choose <em>Open</em>, then confirm — or run
-                <code>xattr -dr com.apple.quarantine /Applications/Vela.app</code>.
-              </p>
-              <p>One universal <code>.dmg</code>: Apple Silicon and Intel in the same file.</p>
+            <div>
+              <dt>macOS</dt>
+              <dd>
+                Gatekeeper says Vela cannot be opened. Right-click the app, choose <em>Open</em>,
+                then confirm — or run
+                <code>xattr -dr com.apple.quarantine /Applications/Vela.app</code>. One universal
+                <code>.dmg</code>, Apple Silicon and Intel together.
+              </dd>
             </div>
-
-            <div class="card">
-              <div class="os-mark">
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M12 2c2.4 0 3.6 1.9 3.5 4.3-.1 1.7.6 2.6 1.4 4 .9 1.5 2.3 3.1 2.4 5.2.1 1.9-1 3-2.2 2.7-.5 1.3-2.6 2.3-5.1 2.3s-4.6-1-5.1-2.3c-1.2.3-2.3-.8-2.2-2.7.1-2.1 1.5-3.7 2.4-5.2.8-1.4 1.5-2.3 1.4-4C8.4 3.9 9.6 2 12 2z"
-                  />
-                </svg>
-                Linux
-              </div>
-              <p>
-                Make it executable first — <code>chmod +x Vela-*.AppImage</code> — then run it. No
-                install step, and no root.
-              </p>
-              <p>An <code>.AppImage</code>, for x86_64 and ARM64.</p>
+            <div>
+              <dt>Linux</dt>
+              <dd>
+                Run <code>chmod +x Vela-*.AppImage</code> first. No install step and no root, for
+                x86_64 and ARM64.
+              </dd>
             </div>
-          </div>
-
-          <p class="callout reveal">
-            <strong>Every platform is built on a machine of its own kind.</strong> A
-            <code>.dmg</code> can only be produced on macOS and an <code>.AppImage</code> on Linux,
-            and neither cross-compiles from a Windows desktop — which is why 0.1.0 shipped
-            Windows-only, and 0.1.1 is the first release carrying all three.
-          </p>
+          </dl>
         </div>
       </section>
 
-      <!-- ---------------------------------------------------------------- -->
-
       <div class="wrap">
-        <div class="closer reveal">
-          <svg width="52" height="52" style="margin-bottom: 20px" aria-hidden="true">
-            <use href="#vela-mark" />
-          </svg>
-          <h2>Two requests. One file. No account.</h2>
+        <div class="closing">
+          <a
+            class="dl-primary"
+            id="closing-download"
+            href="https://github.com/JeffreyHamilton6399/vela/releases/latest"
+          >
+            Download Vela
+          </a>
           <p>
-            Free and open source. Nothing to sign up for, and nothing to switch off once it is
-            installed.
+            Free and open source, under the MIT licence. Every line of it is on
+            <a href="https://github.com/JeffreyHamilton6399/vela">GitHub</a>.
           </p>
-          <div class="downloads">
-            <a
-              class="dl-primary"
-              id="closer-primary"
-              href="https://github.com/JeffreyHamilton6399/vela/releases/latest"
-            >
-              Download Vela
-            </a>
-            <p class="dl-note">
-              Or read every line of it on
-              <a href="https://github.com/JeffreyHamilton6399/vela">GitHub</a>.
-            </p>
-          </div>
         </div>
       </div>
     </main>
 
     <footer>
       <div class="wrap">
-        <span>Vela — MIT licensed. This page is static and loads nothing from anywhere.</span>
+        <span>This page is static, and loads nothing from anywhere.</span>
         <nav>
           <a href="https://github.com/JeffreyHamilton6399/vela">Source</a>
           <a href="https://github.com/JeffreyHamilton6399/vela/releases">Releases</a>
@@ -2317,14 +1476,11 @@
     </footer>
 
     <script>
-      // Everything below is an improvement on a page that is already complete:
-      // the download link works, and every section reads, with none of it
-      // running. Nothing here asks the network which build exists either, so
-      // the release's contents are written out by hand and go stale honestly
-      // rather than silently.
+      // The only script on the page, and it does one thing: point the button at
+      // the build for this machine. Nothing here asks the network what the
+      // release contains, so its contents are written out by hand and go stale
+      // honestly rather than silently.
       (function () {
-        document.documentElement.classList.add('js');
-
         var REPO = 'https://github.com/JeffreyHamilton6399/vela';
         var VERSION = '0.1.1';
         var ASSET = REPO + '/releases/download/v' + VERSION + '/';
@@ -2333,23 +1489,12 @@
           return 'Vela-' + VERSION + '-' + platform + '-' + arch + '.' + ext;
         }
 
-        // Exactly what the release carries, all three platforms of it.
         var targets = {
           windows: {
             label: 'Windows',
             builds: [
-              {
-                arch: 'x64',
-                file: asset('windows', 'x64', 'exe'),
-                short: 'Windows 64-bit',
-                kind: '.exe',
-              },
-              {
-                arch: 'arm64',
-                file: asset('windows', 'arm64', 'exe'),
-                short: 'Windows ARM64',
-                kind: '.exe',
-              },
+              { arch: 'x64', file: asset('windows', 'x64', 'exe'), short: 'Windows 64-bit' },
+              { arch: 'arm64', file: asset('windows', 'arm64', 'exe'), short: 'Windows ARM64' },
             ],
           },
           macos: {
@@ -2361,7 +1506,6 @@
                 arch: 'universal',
                 file: asset('macos', 'universal', 'dmg'),
                 short: 'macOS Universal',
-                kind: '.dmg',
               },
             ],
           },
@@ -2375,14 +1519,8 @@
                 arch: 'x64',
                 file: asset('linux', 'x86_64', 'AppImage'),
                 short: 'Linux 64-bit',
-                kind: '.AppImage',
               },
-              {
-                arch: 'arm64',
-                file: asset('linux', 'arm64', 'AppImage'),
-                short: 'Linux ARM64',
-                kind: '.AppImage',
-              },
+              { arch: 'arm64', file: asset('linux', 'arm64', 'AppImage'), short: 'Linux ARM64' },
             ],
           },
         };
@@ -2392,10 +1530,9 @@
         if (/Mac|iPhone|iPad/.test(ua) || /Mac/.test(navigator.platform || '')) detected = 'macos';
         else if (/Linux|X11|Android/.test(ua)) detected = 'linux';
 
-        var primary = document.querySelector('#download .dl-primary');
-        var closer = document.getElementById('closer-primary');
+        var primary = document.getElementById('download');
+        var closing = document.getElementById('closing-download');
         var alts = document.getElementById('dl-alts');
-        var note = document.getElementById('dl-note');
 
         function pick(entry, arch) {
           for (var i = 0; i < entry.builds.length; i += 1) {
@@ -2404,15 +1541,15 @@
           return entry.builds[0] || null;
         }
 
-        function fillPrimary(element, build) {
-          if (element === null || build === null) return;
+        function fill(element, build, extension) {
+          if (element === null) return;
           element.textContent = 'Download for ' + targets[detected].label;
           element.href = ASSET + build.file;
           element.setAttribute('download', '');
 
           var meta = document.createElement('span');
           meta.className = 'meta';
-          meta.textContent = build.kind + ' · ' + VERSION;
+          meta.textContent = extension + ' · ' + VERSION;
           element.appendChild(meta);
         }
 
@@ -2420,28 +1557,33 @@
           var chosen = pick(targets[detected], arch);
           if (chosen === null) return;
 
-          fillPrimary(primary, chosen);
-          fillPrimary(closer, chosen);
+          var extension = chosen.file.slice(chosen.file.lastIndexOf('.'));
+          fill(primary, chosen, extension);
+          fill(closing, chosen, extension);
 
-          // Every other build, in one row and at one size. Detection is a guess
-          // and the guess is sometimes wrong, so nothing is more than a click
-          // away, and which machine you own is not a reason for a target to be
-          // harder to hit.
+          // The guess is sometimes wrong, so the others are named on one line
+          // rather than given a button each.
           alts.textContent = '';
+          var first = true;
           Object.keys(targets).forEach(function (key) {
             targets[key].builds.forEach(function (build) {
               if (build === chosen) return;
+
+              if (!first) {
+                var separator = document.createElement('span');
+                separator.className = 'sep';
+                separator.textContent = '/';
+                alts.appendChild(separator);
+              }
+              first = false;
+
               var link = document.createElement('a');
-              link.className = 'dl-alt';
               link.href = ASSET + build.file;
               link.setAttribute('download', '');
-              link.textContent = build.short + ' · ' + build.kind;
+              link.textContent = build.short;
               alts.appendChild(link);
             });
           });
-
-          note.textContent =
-            'Looks like ' + targets[detected].label + '. Every build is one click away.';
         }
 
         // Windows on ARM reports itself as x64 in the user agent for
@@ -2458,45 +1600,8 @@
               if (hints && hints.architecture === 'arm') render('arm64');
             })
             .catch(function () {
-              // The safe guess is already on screen, and both are listed below.
+              // The safe guess is already on screen, and the rest are listed.
             });
-        }
-
-        // The header only needs its hairline once the page has moved under it.
-        var header = document.getElementById('site-header');
-        function onScroll() {
-          header.dataset.stuck = window.scrollY > 8 ? 'true' : 'false';
-        }
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
-
-        // Reveal on scroll, where the reader has not asked for less motion. The
-        // CSS only hides these once `.js` is on the document, and this puts
-        // every one of them back if the observer is missing — a section that
-        // never arrives is worse than one that never moved.
-        var reveals = [].slice.call(document.querySelectorAll('.reveal'));
-        var still =
-          typeof window.matchMedia === 'function' &&
-          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-        if (still || typeof IntersectionObserver !== 'function') {
-          reveals.forEach(function (element) {
-            element.classList.add('is-in');
-          });
-        } else {
-          var observer = new IntersectionObserver(
-            function (entries) {
-              entries.forEach(function (entry) {
-                if (!entry.isIntersecting) return;
-                entry.target.classList.add('is-in');
-                observer.unobserve(entry.target);
-              });
-            },
-            { rootMargin: '0px 0px -12% 0px', threshold: 0.05 },
-          );
-          reveals.forEach(function (element) {
-            observer.observe(element);
-          });
         }
       })();
     </script>
