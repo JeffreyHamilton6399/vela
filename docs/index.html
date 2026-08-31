@@ -556,6 +556,10 @@
         scroll-margin-top: 24px;
       }
 
+      section.tight {
+        padding-top: clamp(40px, 5vw, 56px);
+      }
+
       h2 {
         max-width: 26ch;
         text-wrap: balance;
@@ -575,88 +579,25 @@
         margin-bottom: 0;
       }
 
-      strong {
-        color: var(--ink);
-        font-weight: 600;
-      }
-
       /*
-       * Most of the page is this: a term, a sentence about it, and a rule
-       * between them. It was a grid of cards with an icon in every one, which
-       * made each point look exactly as important as the others and the page
-       * look like something generated.
+       * The feature list, which is a list. Every one of these was a paragraph
+       * under a heading of its own, and nobody reading a download page needs a
+       * paragraph to learn that a browser has bookmarks.
        */
-      .rows {
-        margin: 32px 0 0;
-        border-top: 1px solid var(--line);
-      }
-
-      .rows > div {
+      .kit {
         display: grid;
-        grid-template-columns: 200px minmax(0, 1fr);
-        gap: 6px 32px;
-        padding: 20px 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .rows dt {
-        font-weight: 600;
-        letter-spacing: -0.01em;
-      }
-
-      .rows dd {
-        margin: 0;
-        color: var(--ink-muted);
+        grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+        gap: 0 32px;
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
         font-size: 16px;
       }
 
-      @media (max-width: 700px) {
-        .rows > div {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-
-      /* The catalogue: three facts per line, and it reads as one thing. */
-      .models {
-        margin: 36px 0 0;
-        border-top: 1px solid var(--line);
-      }
-
-      .models div {
-        display: flex;
-        align-items: baseline;
-        gap: 16px;
-        padding: 11px 0;
+      .kit li {
+        padding: 9px 0;
         border-bottom: 1px solid var(--line);
-      }
-
-      .models b {
-        min-width: 160px;
-        font-size: 16px;
-        font-weight: 600;
-      }
-
-      .models span {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
         color: var(--ink-muted);
-        font-size: 15px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .models i {
-        color: var(--ink-faint);
-        font-size: 14px;
-        font-style: normal;
-        font-variant-numeric: tabular-nums;
-      }
-
-      @media (max-width: 560px) {
-        .models span {
-          display: none;
-        }
       }
 
       /* ------------------------------------------------------------------ */
@@ -761,7 +702,6 @@
       /* Small print                                                        */
       /* ------------------------------------------------------------------ */
 
-      kbd,
       code {
         border: 1px solid var(--line-soft);
         border-radius: 5px;
@@ -769,11 +709,6 @@
         color: var(--ink);
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 0.85em;
-      }
-
-      kbd {
-        padding: 1px 5px;
-        font-weight: 600;
       }
 
       code {
@@ -853,10 +788,8 @@
           <svg width="24" height="24" aria-hidden="true"><use href="#vela-mark" /></svg>
           Vela
         </a>
-        <nav aria-label="Sections">
+        <nav aria-label="Links">
           <a href="#assistant">Assistant</a>
-          <a href="#features">Features</a>
-          <a href="#install">Install</a>
           <a href="https://github.com/JeffreyHamilton6399/vela">Source</a>
         </nav>
       </div>
@@ -867,9 +800,8 @@
         <span class="version">Version 0.1.1 — Windows, macOS and Linux</span>
         <h1>A browser that collects nothing.</h1>
         <p class="lede">
-          Not less — nothing. There is no server behind Vela and no account to make, and out of the
-          box it sends two kinds of request: the pages you open, and one check for a new version.
-          That is the whole list.
+          No servers, no accounts, no analytics. Vela makes two kinds of request: the pages you
+          open, and one check for a new version.
         </p>
 
         <div class="downloads">
@@ -1190,47 +1122,35 @@
         </div>
       </div>
 
-      <section id="privacy">
+      <section id="kit" class="tight">
+        <div class="wrap">
+          <ul class="kit">
+            <li>Workspaces</li>
+            <li>Web panels</li>
+            <li>Speed Dial</li>
+            <li>Bookmarks and history</li>
+            <li>Command palette</li>
+            <li>Bang shortcuts</li>
+            <li>Private windows</li>
+            <li>Ad and tracker blocking</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="requests">
         <div class="wrap">
           <div class="measure">
-            <h2>What "nothing" means here</h2>
+            <h2>What it sends</h2>
             <p>
-              The pages you navigate to, and one plain GET on the GitHub releases feed — no query
-              parameters, no install identifier, and a user agent that is the version string and
-              nothing else. In development an assertion on Vela's own network layer logs anything
-              that is neither, so an accidental call home turns up while it is being written rather
-              than after it ships.
+              The pages you navigate to, and one plain GET on the GitHub releases feed to see
+              whether there is a newer version. No install identifier, no query string.
             </p>
             <p>
-              Everything Vela remembers is one JSON file on your disk. The settings panel prints its
-              path, and the export button hands you its contents verbatim.
+              Ads and trackers are blocked from EasyList and EasyPrivacy, built into the app. Vela
+              never downloads a filter list, because that would be a third request. Everything it
+              remembers is one JSON file on your disk, and Settings prints the path.
             </p>
           </div>
-
-          <dl class="rows">
-            <div>
-              <dt>Ads and trackers</dt>
-              <dd>
-                Blocked by default, from EasyList and EasyPrivacy compiled into the app when it is
-                built. Vela never fetches a filter list while running, because that would be a third
-                kind of request; the lists refresh by shipping a new version.
-              </dd>
-            </div>
-            <div>
-              <dt>Private windows</dt>
-              <dd>
-                A session held only in memory. A test in the repository browses inside one and
-                proves nothing reached the disk.
-              </dd>
-            </div>
-            <div>
-              <dt>One user agent</dt>
-              <dd>
-                The same string for every install. One unique to your copy is a fingerprint, not a
-                defence.
-              </dd>
-            </div>
-          </dl>
         </div>
       </section>
 
@@ -1238,23 +1158,16 @@
         <div class="wrap">
           <div class="split">
             <div>
-              <h2>The assistant runs inside Vela</h2>
+              <h2>The assistant runs in the app</h2>
               <p>
-                It defaults to <strong>a model running in the app itself</strong>. Nothing else to
-                install, no second program, and no port to talk to: llama.cpp is linked into the
-                process, so a question never becomes a network request in the first place. That is a
-                stronger claim than "it only goes to localhost" — there is no request.
+                By default it is a model inside Vela rather than a service. llama.cpp is compiled
+                in, so asking it something never becomes a network request.
               </p>
               <p>
-                Vela ships without a model on purpose, since four gigabytes in the installer is a
-                miserable download for anyone who never opens the panel. Settings offers a catalogue
-                instead, and the one you pick downloads once — resumable, and checked against its
-                SHA-256 before it is used.
-              </p>
-              <p>
-                Ollama still works if you already run it, and a hosted service works with a key you
-                paste in. Only that last one adds a network destination, which is why it is not the
-                default.
+                No model ships with the installer. You pick one in Settings, it downloads once, and
+                it is checked against its hash before it runs. Ollama works if you already have it,
+                and so does a hosted model with your own key. That last one is the only thing here
+                that talks to anyone.
               </p>
             </div>
 
@@ -1315,135 +1228,18 @@
                 </div>
 
                 <div class="chat">
-                  <p class="bubble is-you">Summarise this page in three lines.</p>
+                  <p class="bubble is-you">Summarise this page.</p>
                   <p class="bubble is-it">
-                    It argues that browser privacy is mostly a question of how many places your
-                    traffic can go, and then counts them…
+                    Six paragraphs on the new filter list, and a table of what it blocks…
                   </p>
-                  <p class="bubble is-you">Is any of this leaving my machine?</p>
-                  <p class="bubble is-it">No. I am running inside this window.</p>
+                  <p class="bubble is-you">Does any of that go anywhere?</p>
+                  <p class="bubble is-it">No. The model is running in this window.</p>
                 </div>
 
                 <div class="panel-input">Ask about this page…</div>
               </div>
             </div>
           </div>
-
-          <div class="models">
-            <div><b>Llama 3.2 1B</b><span>Fine on an old laptop</span><i>0.8 GB</i></div>
-            <div>
-              <b>Gemma 3 4B</b><span>Writes the most naturally of its size</span><i>2.5 GB</i>
-            </div>
-            <div>
-              <b>Qwen 3 4B</b><span>The default — quick, and rarely wrong</span><i>2.5 GB</i>
-            </div>
-            <div>
-              <b>Qwen 2.5 Coder 7B</b><span>Tuned for code and shell commands</span><i>4.7 GB</i>
-            </div>
-            <div><b>Qwen 3 8B</b><span>A step up, if the memory is there</span><i>5.0 GB</i></div>
-          </div>
-        </div>
-      </section>
-
-      <section id="features">
-        <div class="wrap">
-          <div class="measure">
-            <h2>The rest of it is an ordinary browser</h2>
-            <p>
-              Privacy that costs you the features you rely on is a trade most people reasonably
-              refuse, so Vela takes its layout from Opera and its posture from DuckDuckGo.
-            </p>
-          </div>
-
-          <dl class="rows">
-            <div>
-              <dt>Workspaces</dt>
-              <dd>
-                Named tab groups on a left rail. Leaving one suspends its tabs, so an idle workspace
-                costs storage for its titles and nothing else — the renderer is genuinely handed
-                back.
-              </dd>
-            </div>
-            <div>
-              <dt>Web panels</dt>
-              <dd>
-                Any site docked into the sidebar beside the page, on the same hardened session a tab
-                uses. Closing a panel destroys the view rather than leaving it running.
-              </dd>
-            </div>
-            <div>
-              <dt>Speed Dial and the palette</dt>
-              <dd>
-                A new tab page with favicons cached on your own disk, a bookmarks bar, local history
-                feeding a command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, and per-site zoom that
-                sticks.
-              </dd>
-            </div>
-            <div>
-              <dt>Bang shortcuts</dt>
-              <dd>
-                <code>!gh</code>, <code>!yt</code> and <code>!w</code> expand on your machine, so
-                the address reaches the site without a search engine seeing the query on the way
-                past.
-              </dd>
-            </div>
-            <div>
-              <dt>Downloads</dt>
-              <dd>
-                A bubble over the page with a rate and a time remaining. Large transfers retry with
-                a widening wait and resume from the part file rather than starting over.
-              </dd>
-            </div>
-            <div>
-              <dt>No VPN, and no sync</dt>
-              <dd>
-                A browser-branded "free VPN" is someone else's server watching your traffic;
-                Settings takes a proxy you already trust instead. The sign-in is local too — it
-                unlocks an encrypted file on this machine, and there is no server to sync it with.
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </section>
-
-      <section id="install">
-        <div class="wrap">
-          <div class="measure">
-            <h2>The first launch will warn you</h2>
-            <p>
-              The builds are not code-signed yet, so your operating system will say it does not
-              recognise them. Each one is made on a machine of its own kind — a
-              <code>.dmg</code> can only be produced on macOS and an <code>.AppImage</code> on Linux
-              — which is why 0.1.0 shipped Windows-only and 0.1.1 is the first release carrying all
-              three.
-            </p>
-          </div>
-
-          <dl class="rows">
-            <div>
-              <dt>Windows</dt>
-              <dd>
-                SmartScreen says "Windows protected your PC". Click <em>More info</em>, then
-                <em>Run anyway</em>. An <code>.exe</code> for x64 and ARM64.
-              </dd>
-            </div>
-            <div>
-              <dt>macOS</dt>
-              <dd>
-                Gatekeeper says Vela cannot be opened. Right-click the app, choose <em>Open</em>,
-                then confirm — or run
-                <code>xattr -dr com.apple.quarantine /Applications/Vela.app</code>. One universal
-                <code>.dmg</code>, Apple Silicon and Intel together.
-              </dd>
-            </div>
-            <div>
-              <dt>Linux</dt>
-              <dd>
-                Run <code>chmod +x Vela-*.AppImage</code> first. No install step and no root, for
-                x86_64 and ARM64.
-              </dd>
-            </div>
-          </dl>
         </div>
       </section>
 
@@ -1457,8 +1253,9 @@
             Download Vela
           </a>
           <p>
-            Free and open source, under the MIT licence. Every line of it is on
-            <a href="https://github.com/JeffreyHamilton6399/vela">GitHub</a>.
+            The builds are not signed yet, so the first launch gets a warning. On Windows, click
+            <em>More info</em> then <em>Run anyway</em>. On macOS, right-click the app and choose
+            <em>Open</em>. On Linux, run <code>chmod +x</code> on the AppImage.
           </p>
         </div>
       </div>
